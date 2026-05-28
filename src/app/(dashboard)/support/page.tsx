@@ -50,7 +50,7 @@ export default function SupportPage() {
             </div>
             <CardTitle>Contact Support</CardTitle>
             <CardDescription>
-              You are on the Free plan. You can raise a support ticket, and our team will get back to you within 24-48 hours.
+              You can raise a support ticket, and our team will get back to you within 24-48 hours.
             </CardDescription>
           </CardHeader>
           <CardFooter>

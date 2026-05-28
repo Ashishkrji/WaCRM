@@ -24,6 +24,8 @@ import {
   ShoppingCart,
   MessageCircle,
   Bot,
+  CreditCard,
+  Sparkles,
 } from "lucide-react";
 import {
   Avatar,

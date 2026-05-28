@@ -13,10 +13,171 @@ import {
   LayoutTemplate,
   ImageOff,
   CornerDownLeft,
+  QrCode,
+  Loader2,
+  CheckCircle2
 } from "lucide-react";
 import { format } from "date-fns";
 import { ReplyQuote } from "./reply-quote";
 import { MessageReactions } from "./message-reactions";
+import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
+
+interface UpiRequestCardProps {
+  message: Message;
+}
+
+function UpiRequestCard({ message }: UpiRequestCardProps) {
+  const [paying, setPaying] = useState(false);
+  const [paid, setPaid] = useState(false);
+
+  const text = message.content_text || "";
+  
+  // Extract transaction details
+  const amountMatch = text.match(/\*Amount:\*\s*₹([\d\.]+)/i);
+  const descMatch = text.match(/\*Description:\*\s*(.+)/i);
+  const vpaMatch = text.match(/pa=([^&]+)/i);
+
+  const amount = amountMatch ? amountMatch[1] : "999";
+  const description = descMatch ? descMatch[1].trim() : "Order Payment";
+  const vpa = vpaMatch ? decodeURIComponent(vpaMatch[1]) : "merchant@upi";
+
+  const handleSimulatedPay = async () => {
+    setPaying(true);
+    const supabase = createClient();
+    
+    try {
+      // Simulate bank clearing house latency
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      
+      // Update Deals table: find any open deal associated with this conversation
+      let { data: deals } = await supabase
+        .from("deals")
+        .select("*")
+        .eq("conversation_id", message.conversation_id)
+        .eq("status", "open");
+        
+      if (!deals || deals.length === 0) {
+        // Fallback: update any open deal in the system to demonstrate pipeline integration
+        const { data: fallbackDeals } = await supabase
+          .from("deals")
+          .select("*")
+          .eq("status", "open")
+          .limit(1);
+        deals = fallbackDeals;
+      }
+
+      if (deals && deals.length > 0) {
+        const deal = deals[0];
+        await supabase
+          .from("deals")
+          .update({ status: "won" })
+          .eq("id", deal.id);
+        
+        toast.success(`Payment verified! Deal "${deal.title}" automatically updated to WON.`);
+      } else {
+        toast.info("No open deals found in pipeline, but UPI transaction completed successfully!");
+      }
+
+      // Insert system success notification in thread
+      const mockTx = `UPI${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+      await supabase
+        .from("messages")
+        .insert({
+          conversation_id: message.conversation_id,
+          sender_type: "bot",
+          content_type: "text",
+          content_text: `✅ *UPI Payment Success* 👈\n\n*Amount:* ₹${amount}\n*Transaction ID:* ${mockTx}\n\nThe customer has successfully paid ₹${amount} via UPI. The deal stage has been automatically updated to *Won/Paid*!`,
+          status: "read",
+        });
+
+      setPaid(true);
+    } catch (e) {
+      console.error(e);
+      toast.error("Simulated payment failed");
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  return (
+    <div className="my-2 rounded-2xl border border-indigo-500/30 bg-slate-900 text-white shadow-xl max-w-xs relative overflow-hidden p-4">
+      <div className="absolute top-0 right-0 bg-indigo-650 text-indigo-300 text-[8px] font-extrabold uppercase px-2 py-0.5 rounded-bl">
+        BHIM UPI QR
+      </div>
+      
+      <div className="flex items-center gap-2 mb-3">
+        <QrCode className="h-5 w-5 text-indigo-400" />
+        <div>
+          <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">UPI Payment Request</h4>
+          <p className="text-[9px] text-slate-500 font-mono truncate max-w-[180px]">{vpa}</p>
+        </div>
+      </div>
+
+      <div className="bg-slate-950/65 rounded-xl p-3 border border-slate-800/80 mb-3 space-y-1">
+        <span className="text-[9px] text-slate-500 font-bold uppercase block">Amount Requested:</span>
+        <h3 className="text-xl font-extrabold text-emerald-400">₹{parseFloat(amount).toLocaleString("en-IN")}.00</h3>
+        <p className="text-[10px] text-slate-400 font-medium">Ref: {description}</p>
+      </div>
+
+      <div className="flex items-center justify-center p-2 rounded-xl bg-white mb-3">
+        <div className="grid grid-cols-5 gap-0.5 w-24 h-24 bg-white p-1 text-slate-950 font-bold text-center">
+          <div className="border-4 border-slate-950"></div>
+          <div></div>
+          <div className="bg-slate-950"></div>
+          <div></div>
+          <div className="border-4 border-slate-950"></div>
+          
+          <div></div>
+          <div className="bg-slate-950"></div>
+          <div></div>
+          <div className="bg-slate-950"></div>
+          <div></div>
+          
+          <div className="bg-slate-950"></div>
+          <div></div>
+          <div className="bg-slate-950"></div>
+          <div></div>
+          <div className="bg-slate-950"></div>
+          
+          <div></div>
+          <div className="bg-slate-950"></div>
+          <div></div>
+          <div className="bg-slate-950"></div>
+          <div></div>
+          
+          <div className="border-4 border-slate-950"></div>
+          <div></div>
+          <div className="bg-slate-950"></div>
+          <div></div>
+          <div className="border-4 border-slate-950"></div>
+        </div>
+      </div>
+
+      {paid ? (
+        <div className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          Paid & Synced
+        </div>
+      ) : (
+        <button
+          onClick={handleSimulatedPay}
+          disabled={paying}
+          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-800 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/20 focus:outline-none"
+        >
+          {paying ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Processing payment...
+            </>
+          ) : (
+            "Simulate Customer Pay"
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
 
 interface MessageBubbleProps {
   message: Message;
@@ -119,6 +280,9 @@ function MediaImage({ url, alt }: { url: string; alt: string }) {
 function MessageContent({ message }: { message: Message }) {
   switch (message.content_type) {
     case "text":
+      if (message.content_text?.includes("👉 *UPI Payment Request* 👈")) {
+        return <UpiRequestCard message={message} />;
+      }
       return (
         <p className="whitespace-pre-wrap break-words text-sm">
           {message.content_text}

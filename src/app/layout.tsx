@@ -72,7 +72,7 @@ export default function RootLayout({
       className={`${inter.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full bg-background text-foreground font-sans">
+      <body className="min-h-full bg-background text-foreground font-sans" suppressHydrationWarning>
         <script
           id="theme-boot"
           dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }}

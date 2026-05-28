@@ -243,6 +243,48 @@ export function TemplateManager() {
     }
   }
 
+  async function handleLoadReferenceTemplates() {
+    if (!user) return;
+    setSaving(true);
+    try {
+      const examples = [
+        {
+          user_id: user.id,
+          name: 'welcome_message',
+          category: 'Marketing',
+          language: 'en_US',
+          body_text: 'Hi {{1}}! Welcome to our store. We have a special 20% discount for you using code WELCOME20.',
+          status: 'Approved',
+        },
+        {
+          user_id: user.id,
+          name: 'appointment_reminder',
+          category: 'Utility',
+          language: 'en_US',
+          body_text: 'Hello {{1}}, this is a reminder for your upcoming appointment on {{2}}.',
+          status: 'Approved',
+        },
+        {
+          user_id: user.id,
+          name: 'payment_update',
+          category: 'Utility',
+          language: 'en_US',
+          body_text: 'Hi {{1}}, we have successfully received your payment of {{2}}. Thank you!',
+          status: 'Approved',
+        }
+      ];
+      const { error } = await supabase.from('message_templates').insert(examples as any);
+      if (error) throw error;
+      toast.success('Reference templates loaded');
+      await fetchTemplates(user.id);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load templates');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -293,6 +335,15 @@ export function TemplateManager() {
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <p className="text-slate-400 text-sm">No templates yet.</p>
             <p className="text-slate-500 text-xs mt-1">Create your first message template to get started.</p>
+            <div className="flex gap-3 mt-6">
+              <Button onClick={() => { setForm(emptyForm); setDialogOpen(true); }} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Plus className="size-4 mr-2" />
+                Create Template
+              </Button>
+              <Button variant="outline" onClick={handleLoadReferenceTemplates} disabled={saving} className="border-slate-700 text-slate-300 bg-slate-800">
+                Load Examples
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (

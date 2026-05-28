@@ -12,7 +12,6 @@ type Integration = {
   icon: string;
   status: "Connected" | "Available";
   connectType: "API Key" | "OAuth";
-  requiresPlan?: string;
 };
 
 type Category = {
@@ -31,7 +30,6 @@ const INTEGRATION_CATEGORIES: Category[] = [
         icon: "🤖",
         status: "Available",
         connectType: "API Key",
-        requiresPlan: "Growth+",
       },
       {
         id: "openai",
@@ -40,7 +38,6 @@ const INTEGRATION_CATEGORIES: Category[] = [
         icon: "🧠",
         status: "Available",
         connectType: "API Key",
-        requiresPlan: "Growth+",
       },
       {
         id: "zapier",
@@ -173,7 +170,6 @@ const INTEGRATION_CATEGORIES: Category[] = [
         icon: "☁️",
         status: "Available",
         connectType: "OAuth",
-        requiresPlan: "Enterprise",
       },
       {
         id: "pipedrive",
@@ -251,11 +247,6 @@ export function IntegrationsPanel() {
                     key={integration.id}
                     className="flex flex-col p-5 rounded-xl border border-slate-800 bg-slate-900 hover:border-slate-700 transition-colors relative overflow-hidden group"
                   >
-                    {integration.requiresPlan && (
-                      <div className="absolute top-0 right-0 bg-gradient-to-r from-indigo-500 to-purple-600 text-[9px] font-bold tracking-wider px-3 py-1 text-white uppercase rounded-bl-lg shadow-sm">
-                        {integration.requiresPlan}
-                      </div>
-                    )}
                     <div className="flex items-center gap-3 mb-3 mt-1">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-xl group-hover:scale-110 transition-transform">
                         {integration.icon}

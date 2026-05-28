@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Radio, Plus, Loader2 } from 'lucide-react';
 import { getBroadcastStatus } from '@/lib/broadcast-status';
+import { useAuth } from '@/hooks/use-auth';
 
 /**
  * Poll cadence while any broadcast is sending. Kept modest so we don't
@@ -276,6 +277,6 @@ export default function BroadcastsPage() {
           </Table>
         </div>
       )}
-    </div>
+      </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { 
   BarChart3, 
   Users, 
@@ -104,8 +105,8 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6 pb-10">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold text-white tracking-tight">Global Analytics</h1>
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-bold text-white tracking-tight">Global Analytics</h1>
         <p className="text-sm text-slate-400">Track your team's performance, conversation metrics, and sales pipeline health.</p>
       </div>
 
@@ -269,5 +270,5 @@ export default function AnalyticsPage() {
         </Card>
       </div>
     </div>
-  );
+);
 }

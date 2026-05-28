@@ -11,7 +11,6 @@ import { PasswordForm } from '@/components/settings/password-form';
 import { SessionsCard } from '@/components/settings/sessions-card';
 import { AppearancePanel } from '@/components/settings/appearance-panel';
 import { TeamManager } from '@/components/settings/team-manager';
-import { BillingPanel } from '@/components/settings/billing-panel';
 import { IntegrationsPanel } from '@/components/settings/integrations-panel';
 import { PipelineManager } from '@/components/settings/pipeline-manager';
 import { Users, CreditCard, Webhook, GitBranch } from 'lucide-react';
@@ -19,7 +18,6 @@ import { Users, CreditCard, Webhook, GitBranch } from 'lucide-react';
 const TAB_VALUES = [
   'profile',
   'team',
-  'billing',
   'whatsapp',
   'templates',
   'tags',
@@ -77,13 +75,6 @@ export default function SettingsPage() {
             Team
           </TabsTrigger>
           <TabsTrigger
-            value="billing"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
-          >
-            <CreditCard className="size-4" />
-            Billing
-          </TabsTrigger>
-          <TabsTrigger
             value="whatsapp"
             className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
           >
@@ -135,10 +126,6 @@ export default function SettingsPage() {
 
         <TabsContent value="team">
           <TeamManager />
-        </TabsContent>
-
-        <TabsContent value="billing">
-          <BillingPanel />
         </TabsContent>
 
         <TabsContent value="whatsapp">

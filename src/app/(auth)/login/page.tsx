@@ -16,13 +16,23 @@ import {
 } from "@/components/ui/card";
 import { MessageSquare } from "lucide-react";
 
+import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  useEffect(() => {
+    if (searchParams.get("error") === "suspended") {
+      setError("Your account has been deactivated or suspended. Please contact system support.");
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

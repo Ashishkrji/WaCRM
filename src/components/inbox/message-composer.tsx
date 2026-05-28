@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, KeyboardEvent, useEffect } from "react";
-import { Send, LayoutTemplate } from "lucide-react";
+import { Send, LayoutTemplate, QrCode, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ReplyQuote } from "./reply-quote";
@@ -39,6 +39,12 @@ export function MessageComposer({
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const supabase = createClient();
+
+  // India-specific UPI request generator states
+  const [showUpiModal, setShowUpiModal] = useState(false);
+  const [upiVpa, setUpiVpa] = useState("wacrm.merchant@okhdfcbank");
+  const [upiAmount, setUpiAmount] = useState("999");
+  const [upiNote, setUpiNote] = useState("Order Confirmation");
 
   useEffect(() => {
     async function loadQR() {
@@ -81,9 +87,6 @@ export function MessageComposer({
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         
-        // If showing quick replies and there's an exact match or just one, maybe select it?
-        // Keep it simple: Enter sends the message if not selecting. 
-        // We will let them click to select for now to avoid sending accidentally.
         if (showQuickReplies && activeQuickReplies.length > 0) {
           setText(activeQuickReplies[0].message_text);
           setShowQuickReplies(false);
@@ -93,7 +96,6 @@ export function MessageComposer({
         handleSend();
       }
       
-      // Close quick replies if escape is pressed
       if (e.key === "Escape") {
         setShowQuickReplies(false);
       }
@@ -121,7 +123,6 @@ export function MessageComposer({
     setShowQuickReplies(false);
     if (textareaRef.current) {
       textareaRef.current.focus();
-      // small delay to let react update before adjusting height
       setTimeout(adjustHeight, 0);
     }
   }
@@ -155,15 +156,28 @@ export function MessageComposer({
       )}
 
       <div className="flex items-end gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-9 w-9 shrink-0 p-0 text-slate-400 hover:text-white"
-          onClick={onOpenTemplates}
-          title="Send template"
-        >
-          <LayoutTemplate className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 w-9 p-0 text-slate-400 hover:text-white"
+            onClick={onOpenTemplates}
+            title="Send template"
+          >
+            <LayoutTemplate className="h-4 w-4" />
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-9 w-9 p-0 text-indigo-400 hover:text-indigo-300 hover:bg-slate-800/60 transition-all rounded-lg"
+            onClick={() => setShowUpiModal(true)}
+            title="Generate UPI Payment Request"
+          >
+            <QrCode className="h-4.5 w-4.5" />
+          </Button>
+        </div>
 
         <div className="relative flex-1">
           {showQuickReplies && activeQuickReplies.length > 0 && (
@@ -212,12 +226,93 @@ export function MessageComposer({
         </Button>
       </div>
 
-      {/* Hint sits outside the flex row so its height doesn't push
-          `items-end` buttons below the textarea. Indented to line up
-          under the textarea left edge (w-9 button + gap-2 = 44px). */}
-      <p className="mt-1 pl-11 text-[10px] text-slate-600">
-        Type &apos;/&apos; for quick replies
+      <p className="mt-1 pl-20 text-[10px] text-slate-650">
+        Type &apos;/&apos; for quick replies or generate Indian UPI QR invoices
       </p>
+
+      {/* RAZORPAY & BHIM COMPLIANT UPI QR REQUEST MAKER MODAL */}
+      {showUpiModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900 text-white overflow-hidden shadow-2xl animate-in fade-in-50 zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3 bg-slate-950/40">
+              <span className="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
+                <QrCode className="h-4 w-4" />
+                BHIM UPI Payment Request Link
+              </span>
+              <button 
+                type="button"
+                onClick={() => setShowUpiModal(false)} 
+                className="text-slate-400 hover:text-white focus:outline-none"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase">Merchant UPI ID (VPA)</label>
+                <input 
+                  value={upiVpa}
+                  onChange={(e) => setUpiVpa(e.target.value)}
+                  placeholder="merchant@upi"
+                  className="w-full bg-slate-950 border border-slate-800 p-2 text-xs rounded-lg text-white font-mono focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase">Amount (INR)</label>
+                  <input 
+                    value={upiAmount}
+                    onChange={(e) => setUpiAmount(e.target.value)}
+                    placeholder="e.g. 999"
+                    className="w-full bg-slate-950 border border-slate-800 p-2 text-xs rounded-lg text-white focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase">Transaction Note</label>
+                  <input 
+                    value={upiNote}
+                    onChange={(e) => setUpiNote(e.target.value)}
+                    placeholder="Order Confirmation"
+                    className="w-full bg-slate-950 border border-slate-800 p-2 text-xs rounded-lg text-white focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="h-px bg-slate-800 my-2" />
+
+              <div className="flex gap-2 justify-end pt-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowUpiModal(false)}
+                  className="border-slate-800 bg-slate-950 text-slate-400 hover:text-white text-xs h-8 px-3 rounded-lg"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="button" 
+                  onClick={() => {
+                    const cleanNote = encodeURIComponent(upiNote);
+                    const payLink = `upi://pay?pa=${upiVpa}&pn=WaCRM%20Merchant&am=${upiAmount}&cu=INR&tn=${cleanNote}`;
+                    const upiText = `👉 *UPI Payment Request* 👈\n\n*Amount:* ₹${upiAmount}\n*Description:* ${upiNote}\n\nScan this QR or click the link to pay instantly using any UPI App (GPay/PhonePe/Paytm):\n\n🔗 ${payLink}`;
+                    
+                    setText(upiText);
+                    setShowUpiModal(false);
+                    if (textareaRef.current) {
+                      textareaRef.current.focus();
+                      setTimeout(adjustHeight, 0);
+                    }
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-8 px-4 rounded-lg border-0 font-semibold"
+                >
+                  Insert Payment Link
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

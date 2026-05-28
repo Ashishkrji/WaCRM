@@ -711,17 +711,58 @@ function StepEditor({
     onChange({ ...step, step_config: { ...cfg, ...patch } })
 
   switch (step.step_type) {
-    case "send_message":
+    case "send_message": {
+      const getMultilingualWelcome = (lang: string) => {
+        switch (lang) {
+          case "hindi":
+            return "नमस्ते! हमारे WhatsApp CRM चैनल में आपका स्वागत है। 🙏\n\nकृपया अपनी पसंदीदा सेवा का चयन करें:\n1️⃣ नए ऑर्डर और बुकिंग के लिए\n2️⃣ कस्टमर सपोर्ट और हेल्पडेस्क के लिए\n3️⃣ बिजनेस पार्टनरशिप के लिए";
+          case "hinglish":
+            return "Hi! Hamare WhatsApp CRM channel me aapka swagat hai. 😊\n\nApni pasand ki service select karein:\n1️⃣ New Orders & Bookings ke liye\n2️⃣ Customer Support & Helpdesk ke liye\n3️⃣ Business Partnership ke liye";
+          case "tamil":
+            return "வணக்கம்! எங்கள் WhatsApp CRM சேனலுக்கு உங்களை வரவேற்கிறோம். 🙏\n\nஉங்களுக்கு தேவையான சேவையை தேர்வு செய்யவும்:\n1️⃣ புதிய ஆர்டர்கள் மற்றும் முன்பதிவுகளுக்கு\n2️⃣ வாடிக்கையாளர் ஆதரவு மற்றும் உதவிக்கு\n3️⃣ வணிக கூட்டாண்மைக்கு";
+          case "telugu":
+            return "నమస్తే! మా WhatsApp CRM ఛానెల్‌కు స్వాగతం. 🙏\n\nదయచేసి మీ ప్రాధాన్యతను ఎంచుకోండి:\n1️⃣ కొత్త ఆర్డర్లు & బుకింగ్స్ కోసం\n2️⃣ కస్టమర్ సపోర్ట్ & హెల్ప్‌డెస్క్ కోసం\n3️⃣ బిజినెస్ భాగస్వామ్యం కోసం";
+          case "english":
+          default:
+            return "Hi! Welcome to our WhatsApp CRM channel. 😊\n\nPlease select an option to get started:\n1️⃣ For New Orders & Bookings\n2️⃣ For Customer Support & Helpdesk\n3️⃣ For Business Partnerships";
+        }
+      };
+
+      const selectedLang = (cfg.language_template as string) ?? "english";
+
       return (
-        <FieldBlock label="Message text">
-          <Textarea
-            value={(cfg.text as string) ?? ""}
-            onChange={(e) => set({ text: e.target.value })}
-            placeholder="Hi! Thanks for reaching out…"
-            className="min-h-24 bg-slate-800 text-white"
-          />
-        </FieldBlock>
-      )
+        <div className="space-y-3">
+          <FieldBlock label="Chatbot Language Template (India-Optimized)">
+            <select
+              value={selectedLang}
+              onChange={(e) => {
+                const lang = e.target.value;
+                set({ 
+                  language_template: lang,
+                  text: getMultilingualWelcome(lang)
+                });
+              }}
+              className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-white focus:outline-none"
+            >
+              <option value="english">English (Standard)</option>
+              <option value="hindi">Hindi (हिंदी)</option>
+              <option value="hinglish">Hinglish (Hindi + English)</option>
+              <option value="tamil">Tamil (தமிழ்)</option>
+              <option value="telugu">Telugu (తెలుగు)</option>
+            </select>
+          </FieldBlock>
+
+          <FieldBlock label="Message text">
+            <Textarea
+              value={(cfg.text as string) ?? ""}
+              onChange={(e) => set({ text: e.target.value })}
+              placeholder="Hi! Thanks for reaching out…"
+              className="min-h-24 bg-slate-800 text-xs text-white"
+            />
+          </FieldBlock>
+        </div>
+      );
+    }
     case "send_template":
       return (
         <>

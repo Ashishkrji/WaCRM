@@ -199,55 +199,7 @@ const TESTIMONIALS = [
   },
 ];
 
-const PRICING = [
-  {
-    name: "Starter",
-    price: "Free",
-    period: "",
-    desc: "Perfect for solo operators and small businesses getting started.",
-    popular: false,
-    features: [
-      "1 Agent",
-      "1,000 Contacts",
-      "Shared Inbox",
-      "Basic Pipeline",
-      "Community Support",
-    ],
-    cta: "Get Started",
-  },
-  {
-    name: "Growth",
-    price: "$29",
-    period: "/mo",
-    desc: "For growing teams that need automation and campaign tools.",
-    popular: true,
-    features: [
-      "Unlimited Agents",
-      "Unlimited Contacts",
-      "Broadcast Campaigns",
-      "Automation Workflows",
-      "Analytics Dashboard",
-      "Priority Support",
-    ],
-    cta: "Start Free Trial",
-  },
-  {
-    name: "Enterprise",
-    price: "Custom",
-    period: "",
-    desc: "Full self-hosted deployment with unlimited customization.",
-    popular: false,
-    features: [
-      "Self-Hosted",
-      "Unlimited Everything",
-      "Custom Integrations",
-      "Dedicated Support",
-      "SLA Guarantee",
-      "Source Code Access",
-    ],
-    cta: "Book a Demo",
-  },
-];
+
 
 const FAQS = [
   {
@@ -291,7 +243,7 @@ export default function LandingPage() {
             <span className="text-xl font-bold tracking-tight">WaCRM</span>
           </Link>
           <nav className="hidden md:flex items-center gap-8">
-            {["Features", "How it Works", "Use Cases", "Pricing", "FAQ"].map((item) => (
+            {["Features", "How it Works", "Use Cases", "FAQ"].map((item) => (
               <a
                 key={item}
                 href={`#${item.toLowerCase().replace(/\s+/g, "-")}`}
@@ -723,63 +675,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── Pricing ── */}
-        <section id="pricing" className="py-28 bg-[#0a1628]/40 border-y border-white/[0.06] relative overflow-hidden">
-          <img src="/assets/images/pricing_bg_1779614124639.png" className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none" alt="" />
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="text-center mb-20">
-              <Badge variant="outline" className="mb-5 border-primary/20 text-primary bg-primary/5">Pricing</Badge>
-              <h2 className="text-4xl md:text-5xl font-bold mb-4">Simple, transparent pricing</h2>
-              <p className="text-slate-400 text-lg max-w-xl mx-auto">Start free, scale as you grow. No hidden fees, no credit card required.</p>
-            </div>
-            <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto items-center">
-              {PRICING.map((plan) => (
-                <div
-                  key={plan.name}
-                  className={`relative p-8 rounded-2xl border transition-all duration-300 ${
-                    plan.popular
-                      ? "bg-[#0F172A] border-primary/40 shadow-2xl shadow-primary/10 scale-105"
-                      : "bg-[#0F172A]/60 border-white/[0.06] hover:border-primary/20"
-                  }`}
-                >
-                  {plan.popular && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                      <span className="px-4 py-1 rounded-full text-xs font-semibold bg-primary text-primary-foreground shadow-lg shadow-primary/30">
-                        Most Popular
-                      </span>
-                    </div>
-                  )}
-                  <div className="mb-6">
-                    <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
-                    <p className="text-slate-500 text-sm mb-5">{plan.desc}</p>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-extrabold">{plan.price}</span>
-                      <span className="text-slate-500">{plan.period}</span>
-                    </div>
-                  </div>
-                  <ul className="space-y-3 mb-8">
-                    {plan.features.map((f) => (
-                      <li key={f} className="flex items-center gap-2.5 text-sm text-slate-300">
-                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href="/signup" className="block">
-                    <Button className="w-full" variant={plan.popular ? "default" : "outline"}>
-                      {plan.cta}
-                    </Button>
-                  </Link>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap justify-center gap-6 mt-10 text-sm text-slate-500">
-              <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" />No credit card required</span>
-              <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" />14-day free trial</span>
-              <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" />Cancel anytime</span>
-            </div>
-          </div>
-        </section>
+
 
         {/* ── FAQ ── */}
         <section id="faq" className="py-28 relative">

@@ -105,6 +105,40 @@ export function PipelineManager() {
     toast.success("Pipeline created");
   }
 
+  async function handleLoadReferencePipeline() {
+    setCreating(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user) {
+      setCreating(false);
+      return;
+    }
+
+    const { data: pipeline, error } = await supabase
+      .from("pipelines")
+      .insert({ user_id: user.id, name: "B2B Sales Pipeline" })
+      .select()
+      .single();
+
+    if (error || !pipeline) {
+      toast.error("Failed to load reference pipeline");
+      setCreating(false);
+      return;
+    }
+
+    const stagesPayload = SPEC_DEFAULT_STAGES.map((s) => ({
+      pipeline_id: pipeline.id,
+      name: s.name,
+      color: s.color,
+      position: s.position,
+    }));
+    await supabase.from("pipeline_stages").insert(stagesPayload);
+
+    await loadData();
+    setCreating(false);
+    toast.success("Example pipeline loaded");
+  }
+
   const activePipeline = pipelines.find((p) => p.id === editingPipelineId);
 
   return (
@@ -136,9 +170,14 @@ export function PipelineManager() {
           <GitBranch className="h-10 w-10 text-slate-600 mb-4" />
           <p className="text-sm font-medium text-white">No pipelines found</p>
           <p className="text-xs text-slate-500 mt-1 mb-4">You haven't created any sales pipelines yet.</p>
-          <Button variant="outline" onClick={() => setNewPipelineOpen(true)} className="border-slate-700">
-            Create your first pipeline
-          </Button>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => setNewPipelineOpen(true)} className="border-slate-700 text-slate-300">
+              Create your first pipeline
+            </Button>
+            <Button variant="outline" onClick={handleLoadReferencePipeline} disabled={creating} className="border-slate-700 text-slate-300 bg-slate-800">
+              Load Example Pipeline
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

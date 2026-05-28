@@ -39,7 +39,6 @@ export default function SupportTicketPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-200">Category</label>
               <select className="flex h-10 w-full items-center justify-between rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-300 outline-none focus:ring-1 focus:ring-primary/50">
-                <option>Billing & Subscription</option>
                 <option>Technical Issue (Bugs)</option>
                 <option>API & Integrations</option>
                 <option>WhatsApp Setup</option>
