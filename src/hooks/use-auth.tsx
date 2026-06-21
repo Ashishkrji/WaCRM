@@ -198,6 +198,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         console.error("[AuthProvider] init threw:", err);
+        if (mounted) {
+          setProfileLoading(false);
+        }
       } finally {
         if (mounted) setLoading(false);
         clearTimeout(safetyTimer);

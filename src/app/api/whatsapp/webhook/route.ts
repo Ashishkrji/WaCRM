@@ -6,6 +6,8 @@ import { normalizePhone, phonesMatch } from '@/lib/whatsapp/phone-utils'
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
+import { dispatchAIReply } from '@/lib/ai/engine'
+import { logWebhook } from '@/lib/ai/mongodb-logger'
 
 // Lazy-initialized to avoid build-time crash when env vars are missing
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -215,6 +217,14 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
         console.error('No config found for phone_number_id:', phoneNumberId)
         continue
       }
+
+      // Log the incoming webhook to MongoDB Atlas
+      void logWebhook({
+        userId: config.user_id,
+        direction: 'inbound',
+        payload: value,
+        status: 'received',
+      }).catch((err) => console.warn('[webhook] logWebhook failed:', err))
 
       const decryptedAccessToken = decrypt(config.access_token)
 
@@ -650,6 +660,21 @@ async function processMessage(
         conversation_id: conversation.id,
       },
     }).catch((err) => console.error('[automations] dispatch failed:', err))
+  }
+
+  // ============================================================
+  // AI Engine dispatch — fires after flows/automations.
+  // Only activates if ai_router_config.auto_reply = true.
+  // Fire-and-forget: AI failures must never block the webhook.
+  // ============================================================
+  if (!flowConsumed) {
+    dispatchAIReply({
+      userId,
+      contactId: contactRecord.id,
+      conversationId: conversation.id,
+      inboundText,
+      messageType: message.type,
+    }).catch((err) => console.error('[ai/engine] dispatch failed:', err))
   }
 }
 

@@ -16,6 +16,7 @@ import type {
 } from '@/types'
 import { supabaseAdmin } from './admin-client'
 import { engineSendText, engineSendTemplate } from './meta-send'
+import { logAutomation } from '@/lib/ai/mongodb-logger'
 
 // ------------------------------------------------------------
 // Public API
@@ -288,6 +289,16 @@ async function executeStepsFrom(args: ExecuteArgs): Promise<void> {
 
   if (args.parentStepId === null) {
     await appendResults(args.logId, results, status, errorMessage)
+    // Log to MongoDB Atlas
+    void logAutomation({
+      userId: args.automation.user_id,
+      automationId: args.automation.id,
+      contactId: args.contactId || '',
+      triggerType: args.triggerEvent,
+      success: status !== 'failed',
+      stepsExecuted: results,
+      error: errorMessage,
+    }).catch((err) => console.warn('[MongoDB/Logger] logAutomation failed:', err))
   } else {
     // Nested branch — just append results; parent scope decides final status.
     await appendResults(args.logId, results, null, errorMessage)

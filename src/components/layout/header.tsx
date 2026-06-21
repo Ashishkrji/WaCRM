@@ -19,6 +19,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
+import { useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
+
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/inbox": "Inbox",
@@ -43,32 +47,105 @@ interface HeaderProps {
 
 export function Header({ onOpenSidebar }: HeaderProps) {
   const pathname = usePathname();
-  const { profile, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const title = getPageTitle(pathname);
+  const supabase = createClient();
 
-  // SaaS simulated workspaces state for Enterprise
-  const [workspaces, setWorkspaces] = useState<string[]>([
-    "Acme Corp (Main)",
-    "Acme Support & Leads",
-    "Acme Marketing Campaigns"
-  ]);
-  const [activeWorkspace, setActiveWorkspace] = useState("Acme Corp (Main)");
+  const [workspaces, setWorkspaces] = useState<any[]>([]);
+  const [activeWorkspace, setActiveWorkspace] = useState<any | null>(null);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [isAddingWorkspace, setIsAddingWorkspace] = useState(false);
 
+  useEffect(() => {
+    if (!user) return;
+    loadWorkspaces();
+  }, [user, profile]);
+
+  async function loadWorkspaces() {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from("business_workspaces")
+        .select("*")
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        // Auto-provision default business workspace for user
+        const defaultName = `${profile?.full_name || "My"} Business`;
+        const { data: newWs, error: insertErr } = await supabase
+          .from("business_workspaces")
+          .insert({
+            user_id: user.id,
+            name: defaultName,
+          })
+          .select()
+          .single();
+
+        if (insertErr) throw insertErr;
+        if (newWs) {
+          setWorkspaces([newWs]);
+          setActiveWorkspace(newWs);
+          localStorage.setItem("wacrm_active_workspace_id", newWs.id);
+        }
+      } else {
+        setWorkspaces(data);
+        const cachedId = localStorage.getItem("wacrm_active_workspace_id");
+        const cachedWs = data.find((ws) => ws.id === cachedId);
+        if (cachedWs) {
+          setActiveWorkspace(cachedWs);
+        } else {
+          setActiveWorkspace(data[0]);
+          localStorage.setItem("wacrm_active_workspace_id", data[0].id);
+        }
+      }
+    } catch (err: any) {
+      console.error("[header] Failed to load workspaces:", err.message);
+    }
+  }
+
+  const handleSwitchWorkspace = (ws: any) => {
+    setActiveWorkspace(ws);
+    localStorage.setItem("wacrm_active_workspace_id", ws.id);
+    window.dispatchEvent(new Event("wacrm_workspace_changed"));
+    toast.success(`Switched to workspace: ${ws.name}`);
+  };
 
   const initial =
     profile?.full_name?.charAt(0)?.toUpperCase() ??
     profile?.email?.charAt(0)?.toUpperCase() ??
     "U";
 
-  const handleAddWorkspace = (e: React.FormEvent) => {
+  const handleAddWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newWorkspaceName.trim()) {
-      setWorkspaces([...workspaces, newWorkspaceName.trim()]);
-      setActiveWorkspace(newWorkspaceName.trim());
-      setNewWorkspaceName("");
-      setIsAddingWorkspace(false);
+    if (newWorkspaceName.trim() && user) {
+      try {
+        const { data, error } = await supabase
+          .from("business_workspaces")
+          .insert({
+            user_id: user.id,
+            name: newWorkspaceName.trim(),
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          setWorkspaces((prev) =>
+            [...prev, data].sort((a, b) => a.name.localeCompare(b.name)),
+          );
+          setActiveWorkspace(data);
+          localStorage.setItem("wacrm_active_workspace_id", data.id);
+          window.dispatchEvent(new Event("wacrm_workspace_changed"));
+          toast.success(`Workspace "${data.name}" created!`);
+        }
+      } catch (err: any) {
+        toast.error("Failed to create workspace: " + err.message);
+      } finally {
+        setNewWorkspaceName("");
+        setIsAddingWorkspace(false);
+      }
     }
   };
 
@@ -98,7 +175,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
           >
             <Building2 className="h-3.5 w-3.5 text-slate-400" />
             <span className="truncate max-w-[120px] sm:max-w-[180px]">
-              {activeWorkspace}
+              {activeWorkspace?.name || "Select Workspace..."}
             </span>
             <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
           </DropdownMenuTrigger>
@@ -109,12 +186,12 @@ export function Header({ onOpenSidebar }: HeaderProps) {
                 </div>
                 {workspaces.map((ws) => (
                   <DropdownMenuItem
-                    key={ws}
-                    onClick={() => setActiveWorkspace(ws)}
+                    key={ws.id}
+                    onClick={() => handleSwitchWorkspace(ws)}
                     className="flex items-center justify-between cursor-pointer focus:bg-slate-800 focus:text-white"
                   >
-                    <span className="truncate">{ws}</span>
-                    {activeWorkspace === ws && <Check className="h-3.5 w-3.5 text-emerald-500" />}
+                    <span className="truncate">{ws.name}</span>
+                    {activeWorkspace?.id === ws.id && <Check className="h-3.5 w-3.5 text-emerald-500" />}
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator className="bg-slate-800" />

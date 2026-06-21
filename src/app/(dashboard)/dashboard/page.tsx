@@ -7,6 +7,12 @@ import {
   UserPlus,
   DollarSign,
   Send,
+  Sparkles,
+  Bot,
+  ArrowRightLeft,
+  AlertCircle,
+  CheckCircle2,
+  TrendingUp,
 } from 'lucide-react'
 
 import {
@@ -15,7 +21,9 @@ import {
   loadMetrics,
   loadPipelineDonut,
   loadResponseTime,
+  loadAIMetrics,
 } from '@/lib/dashboard/queries'
+import type { AIMetricsBundle } from '@/lib/dashboard/queries'
 import type {
   ActivityItem,
   ConversationsSeriesPoint,
@@ -31,12 +39,16 @@ import { ConversationsChart } from '@/components/dashboard/conversations-chart'
 import { PipelineDonut } from '@/components/dashboard/pipeline-donut'
 import { ResponseTimeChart } from '@/components/dashboard/response-time-chart'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
+import { Badge } from '@/components/ui/badge'
 
 type RangeDays = 7 | 30 | 90
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<MetricsBundle | null>(null)
   const [metricsLoading, setMetricsLoading] = useState(true)
+
+  const [aiMetrics, setAiMetrics] = useState<AIMetricsBundle | null>(null)
+  const [aiMetricsLoading, setAiMetricsLoading] = useState(true)
 
   const [range, setRange] = useState<RangeDays>(30)
   // Keep a cache per range so switching tabs doesn't re-fetch what we
@@ -68,6 +80,11 @@ export default function DashboardPage() {
       .then((m) => setMetrics(m))
       .catch((err) => console.error('[dashboard] metrics failed:', err))
       .finally(() => setMetricsLoading(false))
+
+    void loadAIMetrics(db)
+      .then((aim) => setAiMetrics(aim))
+      .catch((err) => console.error('[dashboard] AI metrics failed:', err))
+      .finally(() => setAiMetricsLoading(false))
 
     void loadConversationsSeries(db, 30)
       .then((s) => setSeries((prev) => ({ ...prev, 30: s })))
@@ -178,6 +195,60 @@ export default function DashboardPage() {
 
       {/* Quick actions */}
       <QuickActions />
+
+      {/* AI Intelligence Dashboard Widgets Section */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4.5 w-4.5 text-indigo-400" />
+          <h2 className="text-base font-bold text-white tracking-tight">Enterprise AI & Lead Intelligence</h2>
+          <Badge className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0">v2.0</Badge>
+        </div>
+        
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
+          {aiMetricsLoading || !aiMetrics ? (
+            Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+          ) : (
+            <>
+              <MetricCard
+                title="Today's Leads"
+                value={aiMetrics.todayLeads.toString()}
+                icon={UserPlus}
+                subtitle="Captured by AI engine"
+              />
+              <MetricCard
+                title="AI Conversations"
+                value={aiMetrics.aiConversationsCount.toString()}
+                icon={Bot}
+                subtitle="Active chatbot threads"
+              />
+              <MetricCard
+                title="Pending Handoffs"
+                value={aiMetrics.pendingHandoffs.toString()}
+                icon={ArrowRightLeft}
+                subtitle="Awaiting agent takeover"
+              />
+              <MetricCard
+                title="Missed Chats"
+                value={aiMetrics.missedChats.toString()}
+                icon={AlertCircle}
+                subtitle="Unresolved handoffs"
+              />
+              <MetricCard
+                title="AI Accuracy"
+                value={`${(aiMetrics.aiAccuracy * 100).toFixed(0)}%`}
+                icon={CheckCircle2}
+                subtitle="LLM confidence avg"
+              />
+              <MetricCard
+                title="Lead Conversion"
+                value={`${aiMetrics.conversionRate.toFixed(0)}%`}
+                icon={TrendingUp}
+                subtitle="AI deals won vs lost"
+              />
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Charts row */}
       {/* items-stretch (the grid default) stretches the two columns to

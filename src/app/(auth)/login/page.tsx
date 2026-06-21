@@ -17,9 +17,9 @@ import {
 import { MessageSquare } from "lucide-react";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -39,10 +39,23 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+
+    // Log login attempt in MongoDB Atlas
+    void fetch("/api/auth/event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "login",
+        email,
+        userId: data?.user?.id || null,
+        status: error ? "failed" : "success",
+        error: error ? error.message : null,
+      }),
+    }).catch((err) => console.error("[Auth/Log] failed:", err));
 
     if (error) {
       setError(error.message);
@@ -132,5 +145,17 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-slate-400">
+        Loading...
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

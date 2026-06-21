@@ -41,7 +41,7 @@ export default function SignupPage() {
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -50,6 +50,20 @@ export default function SignupPage() {
         },
       },
     });
+
+    // Log account creation attempt in MongoDB Atlas
+    void fetch("/api/auth/event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "signup",
+        email,
+        fullName,
+        userId: data?.user?.id || null,
+        status: error ? "failed" : "success",
+        error: error ? error.message : null,
+      }),
+    }).catch((err) => console.error("[Auth/Log] failed:", err));
 
     if (error) {
       setError(error.message);

@@ -39,27 +39,33 @@ export function PipelineManager() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const { data: pData } = await supabase.from("pipelines").select("*").order("created_at");
-    const plines = pData ?? [];
-    setPipelines(plines);
+    try {
+      const { data: pData } = await supabase.from("pipelines").select("*").order("created_at");
+      const plines = pData ?? [];
+      setPipelines(plines);
 
-    if (plines.length > 0) {
-      const { data: sData } = await supabase
-        .from("pipeline_stages")
-        .select("*")
-        .in(
-          "pipeline_id",
-          plines.map((p) => p.id)
-        )
-        .order("position");
+      if (plines.length > 0) {
+        const { data: sData } = await supabase
+          .from("pipeline_stages")
+          .select("*")
+          .in(
+            "pipeline_id",
+            plines.map((p) => p.id)
+          )
+          .order("position");
 
-      const stagesMap: Record<string, PipelineStage[]> = {};
-      plines.forEach((p) => {
-        stagesMap[p.id] = (sData ?? []).filter((s) => s.pipeline_id === p.id);
-      });
-      setStagesByPipeline(stagesMap);
+        const stagesMap: Record<string, PipelineStage[]> = {};
+        plines.forEach((p) => {
+          stagesMap[p.id] = (sData ?? []).filter((s) => s.pipeline_id === p.id);
+        });
+        setStagesByPipeline(stagesMap);
+      }
+    } catch (err: any) {
+      console.error("[PipelineManager] Failed to load pipelines data:", err);
+      toast.error("Failed to load pipelines data");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [supabase]);
 
   useEffect(() => {

@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  wacrm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wacrm:latest
+    container_name: wacrm-app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      # Core Next.js / Server Settings
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      
+      # Supabase Cloud Database Credentials
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      
+      # AES Cryptography Encryption Key (64-character hex string)
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      
+      # App Site Domain URL
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+      
+      # Enterprise AI Settings
+      - AI_PROVIDER=${AI_PROVIDER:-nvidia}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - NVIDIA_MODEL=${NVIDIA_MODEL:-nvidia/llama-3.1-nemotron-70b-instruct}
+      - NVIDIA_EMBEDDING_MODEL=${NVIDIA_EMBEDDING_MODEL:-nvidia/nv-embed-v2}
+      - NVIDIA_BASE_URL=${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      
+      # Optional LLM API Keys
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LOCAL_LLM_BASE_URL=${LOCAL_LLM_BASE_URL}
+      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL}
+      
+      # AI Behavior Tuning
+      - AI_CONFIDENCE_THRESHOLD=${AI_CONFIDENCE_THRESHOLD:-0.7}
+      - AI_MAX_HISTORY_MESSAGES=${AI_MAX_HISTORY_MESSAGES:-20}
+      - AI_MAX_KNOWLEDGE_CHUNKS=${AI_MAX_KNOWLEDGE_CHUNKS:-5}
+      - AI_SUMMARY_TRIGGER_COUNT=${AI_SUMMARY_TRIGGER_COUNT:-50}
+      
+      # Automations / Cron Secret
+      - AUTOMATION_CRON_SECRET=${AUTOMATION_CRON_SECRET}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,85 @@
+========================================================================
+MaaJanki Web Tech — Enterprise Knowledge Base Fact Sheet
+========================================================================
+
+------------------------------------------------------------------------
+1. COMPANY PROFILE & MISSION
+------------------------------------------------------------------------
+MaaJanki Web Tech is a premier digital agency and IT consultation company. We specialize in end-to-end digital transformation, custom software development, digital marketing campaigns, business registrations, and AI-driven workflow automations. Our mission is to deliver premium, enterprise-grade digital products and scaling strategies that help businesses grow.
+
+Contact Details:
+- Support Email: info@maajankiwebtech.com
+- Website: https://maajankiwebtech.com
+- Consultation: Free 15-minute introductory meeting booked via WhatsApp or website portal.
+
+------------------------------------------------------------------------
+2. SERVICES & STANDARD PRICING
+------------------------------------------------------------------------
+We offer high-quality digital agency services with transparent, value-oriented pricing packages:
+
+A. Website Development
+*   WordPress Development:
+    - Ideal for business websites, landing pages, blogs, and corporate identity.
+    - Pricing range: ₹15,000 to ₹35,000 (USD $200 - $450).
+*   Shopify E-Commerce Stores:
+    - Custom theme design, product listings, payment gateway configuration, and checkout optimization.
+    - Pricing range: ₹25,000 to ₹60,000 (USD $300 - $800).
+*   Custom MERN Stack Web Applications:
+    - Built using MongoDB, Express.js, React, and Node.js/Next.js for bespoke, high-performance needs.
+    - Pricing: ₹50,000+ (USD $600+).
+
+B. Application Development
+*   Custom Mobile Apps:
+    - Tailored Android and iOS applications built using React Native or Flutter.
+    - Pricing: ₹80,000+ (USD $1,000+).
+
+C. Search Engine Optimization (SEO)
+*   Services include keyword research, technical SEO optimization, backlink building, and local map SEO.
+*   Pricing: ₹15,000/month (USD $200/month).
+
+D. Digital Marketing & Paid Campaigns
+*   Management of Google Ads, Meta Ads (Facebook/Instagram), and Lead Generation funnels.
+*   Pricing: ₹12,000/month management fee, or 10% of total monthly ad spend (whichever is higher).
+
+E. Branding & Graphic Design
+*   Includes corporate logo design, brand guides, UI/UX interface design, and social media templates.
+*   Pricing: ₹10,000+ (USD $120+).
+
+F. Business Registrations & Filings
+*   GST Registration: Complete application, document review, and approval facilitation.
+    - Price: ₹1,499 flat fee.
+*   ITR Filing (Income Tax Return): Individual or Business tax returns filed by certified accountants.
+    - Price: ₹999+ (depends on complexity and income sources).
+*   Private Limited Company or OPC (One Person Company) Registration:
+    - Includes DIN, DSC, PAN, TAN, and Certificate of Incorporation.
+    - Price: ₹4,999+ (excludes government fees).
+
+G. AI Automations & Integrations
+*   Custom chatbots, API bridges, automatic voice transcribers, CRM setups, and workflows.
+*   Pricing: Custom quote based on scope.
+
+------------------------------------------------------------------------
+3. WORK PORTFOLIO & CASE STUDIES
+------------------------------------------------------------------------
+We have delivered over 150+ successful projects globally. Key case studies:
+- E-Commerce Scale: Redeveloped an online apparel brand on Shopify, improving checkout speed by 40% and increasing conversions by 22% in 90 days.
+- SaaS Platform: Engineered a custom Next.js management dashboard for a logistics firm, reducing manual Excel entries by 85%.
+- SEO Ranking: Assisted a regional home-services provider in climbing to the top 3 of Google local map packs, increasing call bookings by 180%.
+
+------------------------------------------------------------------------
+4. COMPANY POLICIES & FAQS
+------------------------------------------------------------------------
+Q: Do you offer post-launch support?
+A: Yes! Every website development project includes 30 days of complimentary post-launch support covering bugs, performance tweaks, and minor text updates. Extended maintenance contracts are available starting at ₹3,000/month ($40/mo).
+
+Q: What is your payment schedule?
+A: For website and application development, we follow a milestone-based structure: 50% advance deposit to start, 30% upon approval of designs, and 20% right before final deployment/handover.
+
+Q: How long does a standard WordPress website take?
+A: A typical WordPress corporate website takes 7 to 14 business days from the receipt of content and assets. Custom web applications take 3 to 6 weeks.
+
+Q: Are there any refunds?
+A: Due to the customized nature of creative design, development, and registration filings, payments for milestones started or completed are non-refundable.
+
+Q: Do you help with domain and hosting setup?
+A: Absolutely! We help you select and purchase the right domain name and set up hosting (we recommend Hostinger, AWS, or VPS platforms). The hosting and domain subscription costs are paid directly by the client.

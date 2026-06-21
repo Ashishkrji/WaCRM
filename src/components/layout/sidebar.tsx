@@ -26,6 +26,11 @@ import {
   Bot,
   CreditCard,
   Sparkles,
+  Building2,
+  Palette,
+  Webhook,
+  Tag,
+  Settings2,
 } from "lucide-react";
 import {
   Avatar,
@@ -56,15 +61,22 @@ const navItems: NavItem[] = [
   { href: "/inbox", label: "Inbox", icon: MessageSquare },
   { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/pipelines", label: "Pipelines", icon: GitBranch },
+  { href: "/pipeline-manager", label: "Pipeline Manager", icon: Settings2 },
   { href: "/broadcasts", label: "Broadcasts", icon: Radio },
   { href: "/automations", label: "Automations", icon: Zap },
+  { href: "/flows", label: "Flows", icon: Workflow, beta: true },
+  { href: "/templates", label: "Templates", icon: MessageSquare },
   { href: "/quick-replies", label: "Quick Replies", icon: MessageSquare },
-  { href: "/widgets", label: "Chat Widget", icon: MessageCircle },
+  { href: "/tags", label: "Tags", icon: Tag },
   { href: "/segments", label: "Segments", icon: ListFilter },
   { href: "/commerce", label: "Commerce", icon: ShoppingCart },
+  { href: "/integrations", label: "Integrations", icon: Webhook },
+  { href: "/widgets", label: "Chat Widget", icon: MessageCircle },
   { href: "/ai-router", label: "AI Router", icon: Bot },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/flows", label: "Flows", icon: Workflow, beta: true },
+  { href: "/team", label: "Team", icon: Users },
+  { href: "/workspace", label: "Workspace & Branding", icon: Building2 },
+  { href: "/appearance", label: "Appearance", icon: Palette },
 ];
 
 const bottomNavItems = [

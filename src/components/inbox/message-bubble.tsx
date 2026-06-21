@@ -15,7 +15,8 @@ import {
   CornerDownLeft,
   QrCode,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  CreditCard
 } from "lucide-react";
 import { format } from "date-fns";
 import { ReplyQuote } from "./reply-quote";
@@ -179,6 +180,92 @@ function UpiRequestCard({ message }: UpiRequestCardProps) {
   );
 }
 
+interface ProposalCardProps {
+  message: Message;
+}
+
+function ProposalRequestCard({ message }: ProposalCardProps) {
+  const text = message.content_text || "";
+  const linkMatch = text.match(/https?:\/\/[^\s]+/);
+  const link = linkMatch ? linkMatch[0] : "#";
+
+  return (
+    <div className="my-2 rounded-2xl border border-indigo-500/30 bg-slate-900 text-white shadow-xl max-w-xs relative overflow-hidden p-4">
+      <div className="absolute top-0 right-0 bg-indigo-650 text-indigo-300 text-[8px] font-extrabold uppercase px-2 py-0.5 rounded-bl">
+        Proposal
+      </div>
+      
+      <div className="flex items-center gap-2 mb-3">
+        <FileText className="h-5 w-5 text-indigo-400" />
+        <div>
+          <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">MaaJanki Proposal</h4>
+          <p className="text-[9px] text-slate-500 font-mono truncate max-w-[180px]">Acceptance Contract</p>
+        </div>
+      </div>
+
+      <div className="bg-slate-950/65 rounded-xl p-3 border border-slate-800/80 mb-3 space-y-1">
+        <span className="text-[9px] text-slate-500 font-bold uppercase block">Status:</span>
+        <p className="text-xs text-indigo-300 font-semibold flex items-center gap-1">
+          <Clock className="h-3 w-3 animate-pulse text-indigo-400" />
+          Awaiting Client Signature
+        </p>
+      </div>
+
+      <a
+        href={link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-center text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/20 focus:outline-none"
+      >
+        View & Sign Proposal
+      </a>
+    </div>
+  );
+}
+
+interface QuoteCardProps {
+  message: Message;
+}
+
+function QuotationRequestCard({ message }: QuoteCardProps) {
+  const text = message.content_text || "";
+  const linkMatch = text.match(/https?:\/\/[^\s]+/);
+  const link = linkMatch ? linkMatch[0] : "#";
+
+  return (
+    <div className="my-2 rounded-2xl border border-indigo-500/30 bg-slate-900 text-white shadow-xl max-w-xs relative overflow-hidden p-4">
+      <div className="absolute top-0 right-0 bg-indigo-650 text-indigo-300 text-[8px] font-extrabold uppercase px-2 py-0.5 rounded-bl">
+        GST Quote
+      </div>
+      
+      <div className="flex items-center gap-2 mb-3">
+        <CreditCard className="h-5 w-5 text-indigo-400" />
+        <div>
+          <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">GST Invoice Quote</h4>
+          <p className="text-[9px] text-slate-500 font-mono truncate max-w-[180px]">MaaJanki Web Tech Billing</p>
+        </div>
+      </div>
+
+      <div className="bg-slate-950/65 rounded-xl p-3 border border-slate-800/80 mb-3 space-y-1">
+        <span className="text-[9px] text-slate-500 font-bold uppercase block">Status:</span>
+        <p className="text-xs text-amber-400 font-semibold flex items-center gap-1">
+          <Clock className="h-3 w-3 text-amber-500" />
+          Awaiting Payment
+        </p>
+      </div>
+
+      <a
+        href={link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-center text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/20 focus:outline-none"
+      >
+        Review & Pay Invoice
+      </a>
+    </div>
+  );
+}
+
 interface MessageBubbleProps {
   message: Message;
   /** Pre-computed quote info for messages that reply to another. */
@@ -282,6 +369,12 @@ function MessageContent({ message }: { message: Message }) {
     case "text":
       if (message.content_text?.includes("👉 *UPI Payment Request* 👈")) {
         return <UpiRequestCard message={message} />;
+      }
+      if (message.content_text?.includes("📄 *Quotation Generated:*")) {
+        return <QuotationRequestCard message={message} />;
+      }
+      if (message.content_text?.includes("💼 *Proposal Prepared:*")) {
+        return <ProposalRequestCard message={message} />;
       }
       return (
         <p className="whitespace-pre-wrap break-words text-sm">

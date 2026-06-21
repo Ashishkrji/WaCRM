@@ -1,29 +1,16 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Settings, MessageSquare, Tag, User, Palette } from 'lucide-react';
+import { User, Settings } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
-import { TemplateManager } from '@/components/settings/template-manager';
-import { TagManager } from '@/components/settings/tag-manager';
 import { ProfileForm } from '@/components/settings/profile-form';
 import { PasswordForm } from '@/components/settings/password-form';
 import { SessionsCard } from '@/components/settings/sessions-card';
-import { AppearancePanel } from '@/components/settings/appearance-panel';
-import { TeamManager } from '@/components/settings/team-manager';
-import { IntegrationsPanel } from '@/components/settings/integrations-panel';
-import { PipelineManager } from '@/components/settings/pipeline-manager';
-import { Users, CreditCard, Webhook, GitBranch } from 'lucide-react';
 
 const TAB_VALUES = [
   'profile',
-  'team',
   'whatsapp',
-  'templates',
-  'tags',
-  'pipelines',
-  'integrations',
-  'appearance',
 ] as const;
 type TabValue = (typeof TAB_VALUES)[number];
 
@@ -35,10 +22,6 @@ export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // The URL is the single source of truth for the active tab — no
-  // local state, no sync effect. A previous revision duplicated this
-  // into `useState` + a sync effect, which tripped React 19's
-  // set-state-in-effect rule and was also redundant.
   const queryTab = searchParams.get('tab');
   const tab: TabValue = isTabValue(queryTab) ? queryTab : 'profile';
 
@@ -53,8 +36,7 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">Settings</h1>
         <p className="text-sm text-slate-400 mt-1">
-          Manage your profile, WhatsApp® integration, message templates, and
-          tags.
+          Manage your account profile details and WhatsApp® configurations.
         </p>
       </div>
 
@@ -68,53 +50,11 @@ export default function SettingsPage() {
             Profile
           </TabsTrigger>
           <TabsTrigger
-            value="team"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
-          >
-            <Users className="size-4" />
-            Team
-          </TabsTrigger>
-          <TabsTrigger
             value="whatsapp"
             className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
           >
             <Settings className="size-4" />
             WhatsApp Config
-          </TabsTrigger>
-          <TabsTrigger
-            value="templates"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
-          >
-            <MessageSquare className="size-4" />
-            Templates
-          </TabsTrigger>
-          <TabsTrigger
-            value="tags"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
-          >
-            <Tag className="size-4" />
-            Tags
-          </TabsTrigger>
-          <TabsTrigger
-            value="pipelines"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
-          >
-            <GitBranch className="size-4" />
-            Pipelines
-          </TabsTrigger>
-          <TabsTrigger
-            value="integrations"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
-          >
-            <Webhook className="size-4" />
-            Integrations
-          </TabsTrigger>
-          <TabsTrigger
-            value="appearance"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
-          >
-            <Palette className="size-4" />
-            Appearance
           </TabsTrigger>
         </TabsList>
 
@@ -124,32 +64,8 @@ export default function SettingsPage() {
           <SessionsCard />
         </TabsContent>
 
-        <TabsContent value="team">
-          <TeamManager />
-        </TabsContent>
-
         <TabsContent value="whatsapp">
           <WhatsAppConfig />
-        </TabsContent>
-
-        <TabsContent value="templates">
-          <TemplateManager />
-        </TabsContent>
-
-        <TabsContent value="tags">
-          <TagManager />
-        </TabsContent>
-
-        <TabsContent value="pipelines">
-          <PipelineManager />
-        </TabsContent>
-
-        <TabsContent value="integrations">
-          <IntegrationsPanel />
-        </TabsContent>
-
-        <TabsContent value="appearance">
-          <AppearancePanel />
         </TabsContent>
       </Tabs>
     </div>
