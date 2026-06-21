@@ -92,16 +92,7 @@ const nextConfig: NextConfig = {
    * matched.
    */
   async headers() {
-    return [
-      {
-        source: "/_next/static/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
-      },
+    const rules = [
       {
         source: "/api/:path*",
         headers: [{ key: "Cache-Control", value: "no-store" }],
@@ -124,6 +115,20 @@ const nextConfig: NextConfig = {
         headers: [...SECURITY_HEADERS],
       },
     ];
+
+    if (process.env.NODE_ENV === "production") {
+      rules.unshift({
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      });
+    }
+
+    return rules;
   },
 };
 
