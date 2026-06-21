@@ -32,12 +32,66 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname === '/forgot-password'
   )) {
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    const tab = url.searchParams.get('tab')
+    if (tab === 'workspace') {
+      url.pathname = '/workspace'
+      url.searchParams.delete('tab')
+    } else if (tab === 'templates') {
+      url.pathname = '/templates'
+      url.searchParams.delete('tab')
+    } else if (tab === 'tags') {
+      url.pathname = '/tags'
+      url.searchParams.delete('tab')
+    } else if (tab === 'pipelines') {
+      url.pathname = '/pipeline-manager'
+      url.searchParams.delete('tab')
+    } else if (tab === 'integrations') {
+      url.pathname = '/integrations'
+      url.searchParams.delete('tab')
+    } else if (tab === 'appearance') {
+      url.pathname = '/appearance'
+      url.searchParams.delete('tab')
+    } else if (tab === 'team') {
+      url.pathname = '/team'
+      url.searchParams.delete('tab')
+    } else if (tab && ['profile', 'whatsapp'].includes(tab)) {
+      url.pathname = '/settings'
+    } else {
+      url.pathname = '/dashboard'
+    }
     return NextResponse.redirect(url)
   }
 
   // Protected pages - redirect to login if not authenticated
-  const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/settings']
+  const protectedPaths = [
+    '/dashboard',
+    '/inbox',
+    '/contacts',
+    '/pipelines',
+    '/pipeline-manager',
+    '/broadcasts',
+    '/automations',
+    '/flows',
+    '/templates',
+    '/quick-replies',
+    '/tags',
+    '/segments',
+    '/commerce',
+    '/integrations',
+    '/widgets',
+    '/ai-router',
+    '/analytics',
+    '/team',
+    '/workspace',
+    '/appearance',
+    '/support',
+    '/settings',
+    '/admin',
+    '/ai-conversations',
+    '/ai-knowledge',
+    '/developers',
+    '/docs'
+  ]
   if (!user && protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'

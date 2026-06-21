@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   MessageSquare,
@@ -44,6 +45,28 @@ import { Badge } from '@/components/ui/badge'
 type RangeDays = 7 | 30 | 90
 
 export default function DashboardPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const queryTab = searchParams.get('tab')
+
+  useEffect(() => {
+    if (queryTab === 'workspace') {
+      router.replace('/workspace');
+    } else if (queryTab === 'templates') {
+      router.replace('/templates');
+    } else if (queryTab === 'tags') {
+      router.replace('/tags');
+    } else if (queryTab === 'pipelines') {
+      router.replace('/pipeline-manager');
+    } else if (queryTab === 'integrations') {
+      router.replace('/integrations');
+    } else if (queryTab === 'appearance') {
+      router.replace('/appearance');
+    } else if (queryTab === 'team') {
+      router.replace('/team');
+    }
+  }, [queryTab, router]);
+
   const [metrics, setMetrics] = useState<MetricsBundle | null>(null)
   const [metricsLoading, setMetricsLoading] = useState(true)
 

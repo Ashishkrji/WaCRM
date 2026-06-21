@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { User, Settings } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -24,6 +25,24 @@ export default function SettingsPage() {
 
   const queryTab = searchParams.get('tab');
   const tab: TabValue = isTabValue(queryTab) ? queryTab : 'profile';
+
+  useEffect(() => {
+    if (queryTab === 'workspace') {
+      router.replace('/workspace');
+    } else if (queryTab === 'templates') {
+      router.replace('/templates');
+    } else if (queryTab === 'tags') {
+      router.replace('/tags');
+    } else if (queryTab === 'pipelines') {
+      router.replace('/pipeline-manager');
+    } else if (queryTab === 'integrations') {
+      router.replace('/integrations');
+    } else if (queryTab === 'appearance') {
+      router.replace('/appearance');
+    } else if (queryTab === 'team') {
+      router.replace('/team');
+    }
+  }, [queryTab, router]);
 
   const onChange = (next: TabValue) => {
     const params = new URLSearchParams(searchParams.toString());
