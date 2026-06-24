@@ -1,11 +1,11 @@
-'use client';
-
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -73,6 +73,147 @@ export default function ContactsPage() {
 
   // All tags for display
   const [tagsMap, setTagsMap] = useState<Record<string, Tag>>({});
+
+  // Bulk Selection States
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [agents, setAgents] = useState<any[]>([]);
+
+  // Load agents for bulk assignment
+  useEffect(() => {
+    async function loadAgents() {
+      const { data } = await supabase.from('profiles').select('id, full_name');
+      if (data) setAgents(data);
+    }
+    loadAgents();
+  }, [supabase]);
+
+  const toggleSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // prevent opening detail sheet
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    const currentPageIds = contacts.map((c) => c.id);
+    const allSelected = currentPageIds.every((id) => selectedIds.includes(id));
+    
+    if (allSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !currentPageIds.includes(id)));
+    } else {
+      setSelectedIds((prev) => {
+        const next = [...prev];
+        currentPageIds.forEach((id) => {
+          if (!next.includes(id)) next.push(id);
+        });
+        return next;
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} contacts?`)) return;
+    
+    const { error } = await supabase
+      .from('contacts')
+      .delete()
+      .in('id', selectedIds);
+      
+    if (error) {
+      toast.error('Failed to delete selected contacts');
+    } else {
+      toast.success(`${selectedIds.length} contacts deleted`);
+      setSelectedIds([]);
+      fetchContacts();
+    }
+  };
+
+  const handleBulkAssignOwner = async (ownerId: string) => {
+    if (selectedIds.length === 0 || !ownerId) return;
+    const { error } = await supabase
+      .from('contacts')
+      .update({ owner_id: ownerId })
+      .in('id', selectedIds);
+      
+    if (error) {
+      toast.error('Failed to assign owner');
+    } else {
+      toast.success(`Owner assigned for ${selectedIds.length} contacts`);
+      setSelectedIds([]);
+      fetchContacts();
+    }
+  };
+
+  const handleBulkAddTag = async (tagId: string) => {
+    if (selectedIds.length === 0 || !tagId) return;
+    
+    const rows = selectedIds.map(id => ({
+      contact_id: id,
+      tag_id: tagId
+    }));
+    
+    const { error } = await supabase
+      .from('contact_tags')
+      .insert(rows);
+      
+    if (error) {
+      toast.error('Failed to assign tags (some may already have this tag)');
+    } else {
+      toast.success(`Tag assigned to ${selectedIds.length} contacts`);
+      setSelectedIds([]);
+      fetchContacts();
+    }
+  };
+
+  const handleBulkExportCSV = () => {
+    if (selectedIds.length === 0) return;
+    const selectedContacts = contacts.filter(c => selectedIds.includes(c.id));
+    
+    const headers = ['Name', 'Phone', 'Email', 'Company', 'Website', 'Industry', 'Lead Source', 'Status', 'Created At'];
+    const rows = selectedContacts.map(c => [
+      c.name || '',
+      c.phone || '',
+      c.email || '',
+      c.company || '',
+      c.website || '',
+      c.industry || '',
+      c.lead_source || '',
+      c.status || '',
+      c.created_at || '',
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')),
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `wacrm_contacts_export_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('CSV export downloaded');
+  };
+
+  const handleBulkExportJSON = () => {
+    if (selectedIds.length === 0) return;
+    const selectedContacts = contacts.filter(c => selectedIds.includes(c.id));
+    const jsonContent = JSON.stringify(selectedContacts, null, 2);
+    
+    const blob = new Blob([jsonContent], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `wacrm_contacts_export_${new Date().toISOString().slice(0,10)}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('JSON export downloaded');
+  };
 
   const fetchTags = useCallback(async () => {
     const { data } = await supabase.from('tags').select('*');
@@ -255,6 +396,14 @@ export default function ContactsPage() {
         <Table>
           <TableHeader>
             <TableRow className="border-slate-800 hover:bg-transparent">
+              <TableHead className="w-12 text-slate-400 text-center">
+                <input
+                  type="checkbox"
+                  checked={contacts.length > 0 && contacts.every(c => selectedIds.includes(c.id))}
+                  onChange={toggleSelectAll}
+                  className="rounded bg-slate-950 border-slate-800 text-primary focus:ring-primary/40 size-3.5 cursor-pointer"
+                />
+              </TableHead>
               <TableHead className="text-slate-400">Name</TableHead>
               <TableHead className="text-slate-400">Phone</TableHead>
               <TableHead className="text-slate-400 hidden md:table-cell">Email</TableHead>
@@ -267,7 +416,7 @@ export default function ContactsPage() {
           <TableBody>
             {loading ? (
               <TableRow className="border-slate-800">
-                <TableCell colSpan={7} className="text-center py-12">
+                <TableCell colSpan={8} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2">
                     <Loader2 className="size-6 animate-spin text-primary" />
                     <p className="text-sm text-slate-500">Loading contacts...</p>
@@ -276,8 +425,8 @@ export default function ContactsPage() {
               </TableRow>
             ) : contacts.length === 0 ? (
               <TableRow className="border-slate-800">
-                <TableCell colSpan={7} className="text-center py-12">
-                  <div className="flex flex-col items-center gap-2">
+                <TableCell colSpan={8} className="text-center py-12">
+                  <div className="flex flex-col items-center gap-2 flex-1">
                     <Users className="size-8 text-slate-600" />
                     <p className="text-sm text-slate-500">
                       {search ? 'No contacts match your search.' : 'No contacts yet.'}
@@ -300,9 +449,20 @@ export default function ContactsPage() {
               contacts.map((contact) => (
                 <TableRow
                   key={contact.id}
-                  className="border-slate-800 hover:bg-slate-900/50 cursor-pointer"
+                  className={cn(
+                    "border-slate-800 hover:bg-slate-900/50 cursor-pointer transition-colors",
+                    selectedIds.includes(contact.id) && "bg-slate-900/30 border-l-2 border-primary"
+                  )}
                   onClick={() => openDetail(contact.id)}
                 >
+                  <TableCell className="text-center" onClick={e => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(contact.id)}
+                      onChange={e => toggleSelect(contact.id, e as any)}
+                      className="rounded bg-slate-955 border-slate-800 text-primary focus:ring-primary/40 size-3.5 cursor-pointer"
+                    />
+                  </TableCell>
                   <TableCell className="text-white font-medium">
                     {contact.name || <span className="text-slate-500 italic">Unnamed</span>}
                   </TableCell>
@@ -488,6 +648,80 @@ export default function ContactsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Floating Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-2xl bg-slate-900 border border-primary/35 shadow-2xl rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 animate-in slide-in-from-bottom-5 duration-300 text-xs">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-primary/20 text-primary border border-primary/30 text-xs font-black">
+              {selectedIds.length} Selected
+            </Badge>
+            <span className="text-[11px] text-slate-400 font-semibold hidden sm:inline">Bulk Operations</span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            {/* Owner Assign Select */}
+            <select
+              onChange={(e) => {
+                handleBulkAssignOwner(e.target.value);
+                e.target.value = '';
+              }}
+              className="bg-slate-950 border border-slate-800 text-slate-300 rounded px-2.5 py-1 outline-none text-[11px] font-semibold focus:border-primary/50 cursor-pointer"
+            >
+              <option value="">Assign Owner...</option>
+              {agents.map(a => (
+                <option key={a.id} value={a.id}>{a.full_name}</option>
+              ))}
+            </select>
+
+            {/* Tag Assign Select */}
+            <select
+              onChange={(e) => {
+                handleBulkAddTag(e.target.value);
+                e.target.value = '';
+              }}
+              className="bg-slate-955 border border-slate-800 text-slate-300 rounded px-2.5 py-1 outline-none text-[11px] font-semibold focus:border-primary/50 cursor-pointer"
+            >
+              <option value="">Assign Tag...</option>
+              {Object.values(tagsMap).map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+
+            {/* Export Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="outline" size="sm" className="h-7 border-slate-800 bg-slate-950 hover:bg-slate-850 hover:text-white text-slate-300 text-[11px] px-2.5 rounded">
+                    Export...
+                  </Button>
+                }
+              />
+              <DropdownMenuContent className="bg-slate-950 border-slate-800 text-slate-205">
+                <DropdownMenuItem onClick={handleBulkExportCSV} className="focus:bg-slate-850 cursor-pointer">CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleBulkExportJSON} className="focus:bg-slate-850 cursor-pointer">JSON</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Bulk Delete */}
+            <Button
+              onClick={handleBulkDelete}
+              variant="destructive"
+              size="sm"
+              className="h-7 text-[11px] font-bold px-3 rounded"
+            >
+              Delete
+            </Button>
+
+            <button
+              onClick={() => setSelectedIds([])}
+              className="text-slate-450 hover:text-white text-xs pl-2 border-l border-slate-800 cursor-pointer"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

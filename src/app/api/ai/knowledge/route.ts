@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { connectToDatabase } from '@/lib/mongodb'
+import { dbService } from '@/services/db'
 import { type SupabaseClient } from '@supabase/supabase-js'
-import { ingestText, fetchWebsiteContent, deleteDocumentEmbeddings } from '@/lib/ai/knowledge/ingest'
+import { ingestText, fetchWebsiteContent, crawlWebsite } from '@/lib/ai/knowledge/ingest'
 import crypto from 'crypto'
 
 async function requireUser(): Promise<
@@ -26,11 +26,8 @@ export async function GET() {
   }
 
   try {
-    const { db } = await connectToDatabase()
-    const documents = await db.collection('knowledge_base')
-      .find({ user_id: guard.userId })
-      .sort({ created_at: -1 })
-      .toArray()
+    // Fetch documents from MongoDB Atlas via Database Service Layer
+    const documents = await dbService.ai.listKnowledgeBase(guard.userId)
 
     const formatted = documents.map(doc => ({
       id: doc.id || doc._id.toString(),
@@ -39,6 +36,9 @@ export async function GET() {
       status: doc.status,
       chunk_count: doc.chunk_count || 0,
       error_message: doc.error_message || null,
+      category: doc.category || 'General',
+      tags: doc.tags || [],
+      source_url: doc.source_url || null,
       created_at: doc.created_at,
     }))
 
@@ -62,6 +62,10 @@ export async function POST(request: Request) {
       doc_type?: string
       content?: string
       source_url?: string
+      category?: string
+      tags?: string[]
+      crawl_depth?: number
+      max_pages?: number
     } | null
 
     if (!body || typeof body.title !== 'string' || typeof body.doc_type !== 'string') {
@@ -74,9 +78,14 @@ export async function POST(request: Request) {
     const title = body.title
     const doc_type = body.doc_type
     const { content, source_url } = body
-    const docId = crypto.randomUUID()
+    const category = body.category || 'General'
+    const tags = body.tags || []
+    
+    // Cap depth to 3, max pages to 20 to prevent server timeouts
+    const crawl_depth = Math.min(3, Math.max(1, body.crawl_depth || 1))
+    const max_pages = Math.min(20, Math.max(1, body.max_pages || 10))
 
-    const { db } = await connectToDatabase()
+    const docId = crypto.randomUUID()
 
     const doc = {
       id: docId,
@@ -85,13 +94,16 @@ export async function POST(request: Request) {
       doc_type,
       content: content || null,
       source_url: source_url || null,
+      category,
+      tags,
       status: 'pending',
       chunk_count: 0,
       created_at: new Date(),
       updated_at: new Date(),
     }
 
-    await db.collection('knowledge_base').insertOne(doc)
+    // Insert doc via dbService
+    await dbService.ai.insertKnowledgeDoc(doc)
 
     // Trigger background ingestion
     if (content) {
@@ -99,34 +111,88 @@ export async function POST(request: Request) {
         userId,
         knowledgeBaseId: docId,
         content,
+        category,
+        tags,
+        sourceUrl: source_url || null,
       }).catch((err) => {
         console.error('[knowledge/ingest] Background ingest failed:', err)
       })
     } else if (doc_type === 'website' && source_url) {
       void (async () => {
         try {
-          const fetchedContent = await fetchWebsiteContent(source_url)
-          
-          const { db: innerDb } = await connectToDatabase()
-          await innerDb.collection('knowledge_base').updateOne(
-            { id: docId },
-            { $set: { content: fetchedContent, updated_at: new Date() } }
-          )
+          // Crawl recursively
+          const crawledPages = await crawlWebsite(source_url, crawl_depth, max_pages)
+
+          if (crawledPages.length === 0) {
+            await dbService.ai.updateKnowledgeDoc(docId, {
+              status: 'failed',
+              error_message: 'No readable pages crawled from start URL.',
+              updated_at: new Date(),
+            })
+            return
+          }
+
+          // First page content updates the primary document
+          const firstPage = crawledPages[0]
+          await dbService.ai.updateKnowledgeDoc(docId, {
+            title: firstPage.title || title,
+            content: firstPage.content,
+            updated_at: new Date(),
+          })
 
           await ingestText({
             userId,
             knowledgeBaseId: docId,
-            content: fetchedContent,
+            content: firstPage.content,
+            category,
+            tags,
+            sourceUrl: firstPage.url,
           })
+
+          // Additional pages create new sub-documents dynamically
+          for (let i = 1; i < crawledPages.length; i++) {
+            const page = crawledPages[i]
+            const subDocId = crypto.randomUUID()
+
+            const subDoc = {
+              id: subDocId,
+              user_id: userId,
+              title: page.title || `${title} - Page ${i + 1}`,
+              doc_type: 'website',
+              content: page.content,
+              source_url: page.url,
+              category,
+              tags,
+              status: 'pending',
+              chunk_count: 0,
+              created_at: new Date(),
+              updated_at: new Date(),
+            }
+
+            await dbService.ai.insertKnowledgeDoc(subDoc)
+
+            await ingestText({
+              userId,
+              knowledgeBaseId: subDocId,
+              content: page.content,
+              category,
+              tags,
+              sourceUrl: page.url,
+            }).catch((err) => {
+              console.error('[knowledge/ingest] Background subDoc ingest failed:', err)
+            })
+          }
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err)
-          console.error('[knowledge/ingest] Website fetch/ingest failed:', errMsg)
+          console.error('[knowledge/ingest] Website crawl/ingest failed:', errMsg)
           
-          const { db: innerDb } = await connectToDatabase()
-          await innerDb.collection('knowledge_base').updateOne(
-            { id: docId },
-            { $set: { status: 'failed', error_message: `Fetch failed: ${errMsg}`, updated_at: new Date() } }
-          )
+          await dbService.ai.updateKnowledgeDoc(docId, {
+            status: 'failed',
+            error_message: `Crawl failed: ${errMsg}`,
+            updated_at: new Date(),
+          }).catch((dbErr) => {
+            console.error('[knowledge/ingest] Failed to update document failure status:', dbErr)
+          })
         }
       })()
     }
@@ -154,12 +220,7 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    const { db } = await connectToDatabase()
-    
-    const doc = await db.collection('knowledge_base').findOne({
-      id: id,
-      user_id: userId
-    })
+    const doc = await dbService.ai.getKnowledgeDoc(userId, id)
 
     if (!doc) {
       return NextResponse.json(
@@ -168,8 +229,8 @@ export async function DELETE(request: Request) {
       )
     }
 
-    // Delete embeddings first from MongoDB
-    await deleteDocumentEmbeddings(doc.id)
+    // Delete embeddings first via dbService
+    await dbService.ai.deleteKnowledgeEmbeddings(doc.id)
 
     // Delete file from Supabase Storage if storage_path exists
     if (doc.storage_path) {
@@ -182,8 +243,8 @@ export async function DELETE(request: Request) {
       }
     }
 
-    // Delete from MongoDB knowledge_base
-    await db.collection('knowledge_base').deleteOne({ id: doc.id })
+    // Delete from MongoDB knowledge_base via dbService
+    await dbService.ai.deleteKnowledgeDoc(doc.id)
 
     return NextResponse.json({ success: true, message: 'Document deleted successfully' })
   } catch (error) {

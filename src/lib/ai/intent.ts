@@ -13,22 +13,37 @@
  */
 
 import { tryGetAIProvider } from './provider-factory'
-import type { IntentAnalysis, MessageIntent, MessageSentiment } from './types'
+import type { IntentAnalysis, MessageIntent, MessageSentiment, AIAgentId } from './types'
 
 // Fast, cheap model for classification — override per provider if needed
 const INTENT_MAX_TOKENS = 150
 const INTENT_TEMPERATURE = 0.1 // low for deterministic classification
 
-const INTENT_SYSTEM_PROMPT = `You are a message classifier for a WhatsApp customer service system.
+const INTENT_SYSTEM_PROMPT = `You are a message classifier for a digital agency (MaaJanki Web Tech) customer service system.
 Analyze the customer message and respond ONLY with valid JSON in this exact format:
 {
   "intent": "<one of: question|complaint|booking|pricing|greeting|farewell|human_request|other>",
   "sentiment": "<one of: positive|neutral|negative>",
   "language": "<ISO 639-1 code e.g. en|hi|ar|es|fr|pt|zh>",
-  "wantsHuman": <true|false>
+  "wantsHuman": <true|false>,
+  "selectedAgent": "<one of: receptionist|sales|website_consultant|seo_consultant|digital_marketing|business_registration|proposal_writer|quotation_generator|scheduler|support|general>"
 }
 
 wantsHuman should be true if the customer explicitly asks for a human, agent, or person.
+
+Choose the most suitable selectedAgent:
+- receptionist: First-time greetings, introductions, or when they speak a different language and we need to collect basic details.
+- sales: Service inquiries, package questions, standard budgets, or buying interest.
+- website_consultant: Custom website development, WordPress, Shopify, React/Next.js/MERN technical queries.
+- seo_consultant: Search Engine Optimization, Google rankings, backlinks, GBP optimization.
+- digital_marketing: Google/Meta Ads campaigns, Instagram/Facebook ads spend, funnel marketing.
+- business_registration: GST registration, ITR tax filings, Private Limited or corporate startup compliance.
+- proposal_writer: Custom scope, timeline, deliverables, or contract proposal details.
+- quotation_generator: Quotation summaries, billing estimates, discount math.
+- scheduler: Requesting a consultation, booking a meeting time slot, scheduling calls.
+- support: Refunds, policies, maintenance agreements, complaints, hosting setup.
+- general: Any general questions that don't fit the above categories.
+
 Do not include any explanation or markdown — only the JSON object.`
 
 /**
@@ -41,6 +56,7 @@ export async function analyzeIntent(text: string): Promise<IntentAnalysis> {
     sentiment: 'neutral',
     language: 'en',
     wantsHuman: false,
+    selectedAgent: 'general',
   }
 
   if (!text.trim()) return defaultResult
@@ -68,6 +84,11 @@ export async function analyzeIntent(text: string): Promise<IntentAnalysis> {
       'greeting', 'farewell', 'human_request', 'other',
     ]
     const validSentiments: MessageSentiment[] = ['positive', 'neutral', 'negative']
+    const validAgents: AIAgentId[] = [
+      'receptionist', 'sales', 'website_consultant', 'seo_consultant',
+      'digital_marketing', 'business_registration', 'proposal_writer',
+      'quotation_generator', 'scheduler', 'support', 'general',
+    ]
 
     return {
       intent: validIntents.includes(parsed.intent) ? parsed.intent : 'other',
@@ -76,6 +97,9 @@ export async function analyzeIntent(text: string): Promise<IntentAnalysis> {
         : 'neutral',
       language: typeof parsed.language === 'string' ? parsed.language.slice(0, 5) : 'en',
       wantsHuman: Boolean(parsed.wantsHuman),
+      selectedAgent: validAgents.includes(parsed.selectedAgent)
+        ? parsed.selectedAgent
+        : 'general',
     }
   } catch (err) {
     console.warn('[AI/intent] analyzeIntent failed (non-fatal):', err)

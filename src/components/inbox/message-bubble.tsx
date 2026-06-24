@@ -513,18 +513,29 @@ export function MessageBubble({
   return (
     <div
       className={cn(
-        "flex flex-col",
-        isAgent ? "items-end" : "items-start",
+        "flex flex-col w-full",
+        message.is_internal
+          ? "items-center"
+          : isAgent
+            ? "items-end"
+            : "items-start",
       )}
     >
       <div
         className={cn(
           "relative rounded-2xl px-3 py-2",
-          isAgent
-            ? "rounded-br-md bg-primary text-primary-foreground"
-            : "rounded-bl-md bg-slate-800 text-slate-100",
+          message.is_internal
+            ? "border border-amber-550/20 bg-amber-500/10 text-amber-200 text-xs shadow-md p-4 max-w-[85%]"
+            : isAgent
+              ? "rounded-br-md bg-primary text-primary-foreground"
+              : "rounded-bl-md bg-slate-800 text-slate-100",
         )}
       >
+        {message.is_internal && (
+          <div className="mb-1 text-[10px] uppercase font-bold text-amber-400 tracking-wider">
+            🔒 Private Internal Note
+          </div>
+        )}
         {reply && (
           <ReplyQuote authorLabel={reply.authorLabel} preview={reply.preview} />
         )}
@@ -532,11 +543,15 @@ export function MessageBubble({
         <div
           className={cn(
             "mt-1 flex items-center gap-1",
-            isAgent ? "justify-end" : "justify-start",
+            message.is_internal
+              ? "justify-center"
+              : isAgent
+                ? "justify-end"
+                : "justify-start",
           )}
         >
           <span className="text-[10px] text-white/60">{time}</span>
-          {isAgent && <StatusIcon status={message.status} />}
+          {isAgent && !message.is_internal && <StatusIcon status={message.status} />}
         </div>
       </div>
       {reactions && reactions.length > 0 && onToggleReaction && (

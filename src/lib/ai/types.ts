@@ -110,6 +110,38 @@ export type MessageIntent =
 
 export type MessageSentiment = 'positive' | 'neutral' | 'negative'
 
+export type AIAgentId =
+  | 'receptionist'
+  | 'sales'
+  | 'website_consultant'
+  | 'seo_consultant'
+  | 'digital_marketing'
+  | 'business_registration'
+  | 'proposal_writer'
+  | 'quotation_generator'
+  | 'scheduler'
+  | 'support'
+  | 'lead_qualification'
+  | 'crm_assistant'
+  | 'analytics_assistant'
+  | 'team_assistant'
+  | 'general'
+
+export interface AIAgentConfig {
+  userId: string
+  agentId: AIAgentId
+  enabled: boolean
+  name: string
+  description: string
+  systemPrompt: string
+  provider?: string
+  model?: string
+  temperature?: number
+  priority: number
+  tools: string[]
+  updatedAt: string
+}
+
 export interface IntentAnalysis {
   intent: MessageIntent
   sentiment: MessageSentiment
@@ -117,6 +149,8 @@ export interface IntentAnalysis {
   language: string
   /** True when the customer explicitly asked to speak to a human. */
   wantsHuman: boolean
+  /** Mapped specialized agent for routing. */
+  selectedAgent?: AIAgentId
 }
 
 // ------------------------------------------------------------

@@ -23,6 +23,32 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+const CATEGORIES = [
+  "General",
+  "Website Development",
+  "WordPress",
+  "Shopify",
+  "React",
+  "Next.js",
+  "MERN",
+  "SEO",
+  "Google Ads",
+  "Meta Ads",
+  "Branding",
+  "Graphic Design",
+  "UI UX",
+  "Application Development",
+  "Business Registration",
+  "GST",
+  "ITR",
+  "Consultation",
+  "Pricing",
+  "Portfolio",
+  "Case Studies",
+  "FAQs",
+  "Policies"
+];
+
 interface KnowledgeDoc {
   id: string;
   title: string;
@@ -30,6 +56,9 @@ interface KnowledgeDoc {
   status: "pending" | "processing" | "ready" | "failed";
   chunk_count: number;
   error_message?: string;
+  category?: string;
+  tags?: string[];
+  source_url?: string;
   created_at: string;
 }
 
@@ -41,8 +70,15 @@ export default function AiKnowledgePage() {
   
   // Form states
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileCategory, setFileCategory] = useState("General");
+  const [fileTags, setFileTags] = useState("");
+
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [websiteTitle, setWebsiteTitle] = useState("");
+  const [webCategory, setWebCategory] = useState("General");
+  const [webTags, setWebTags] = useState("");
+  const [crawlDepth, setCrawlDepth] = useState(1);
+  const [maxPages, setMaxPages] = useState(10);
 
   // Load documents on mount
   useEffect(() => {
@@ -101,6 +137,7 @@ export default function AiKnowledgePage() {
     try {
       const urlText = websiteUrl.trim();
       const titleText = websiteTitle.trim() || new URL(urlText).hostname || "Website";
+      const parsedTags = webTags.split(",").map(t => t.trim()).filter(Boolean);
 
       const res = await fetch("/api/ai/knowledge", {
         method: "POST",
@@ -109,6 +146,10 @@ export default function AiKnowledgePage() {
           title: titleText,
           doc_type: "website",
           source_url: urlText,
+          category: webCategory,
+          tags: parsedTags,
+          crawl_depth: crawlDepth,
+          max_pages: maxPages,
         }),
       });
 
@@ -120,6 +161,10 @@ export default function AiKnowledgePage() {
       toast.success("Website URL added! Ingesting content in the background...");
       setWebsiteUrl("");
       setWebsiteTitle("");
+      setWebTags("");
+      setWebCategory("General");
+      setCrawlDepth(1);
+      setMaxPages(10);
       fetchDocuments();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -138,6 +183,11 @@ export default function AiKnowledgePage() {
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
+      formData.append("category", fileCategory);
+      if (fileTags.trim()) {
+        const parsedTags = fileTags.split(",").map(t => t.trim()).filter(Boolean);
+        formData.append("tags", JSON.stringify(parsedTags));
+      }
 
       const res = await fetch("/api/ai/knowledge/upload", {
         method: "POST",
@@ -151,6 +201,8 @@ export default function AiKnowledgePage() {
 
       toast.success(`${selectedFile.name} uploaded successfully! Indexing...`);
       setSelectedFile(null);
+      setFileTags("");
+      setFileCategory("General");
       // Reset input element
       const fileInput = document.getElementById("file-upload") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
@@ -282,6 +334,33 @@ export default function AiKnowledgePage() {
                   </div>
                 </div>
 
+                <div className="space-y-1.5">
+                  <Label htmlFor="file-category" className="text-xs text-slate-300">Category</Label>
+                  <select
+                    id="file-category"
+                    value={fileCategory}
+                    onChange={(e) => setFileCategory(e.target.value)}
+                    className="w-full rounded-md border border-slate-700 bg-slate-800 text-white text-xs px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="file-tags" className="text-xs text-slate-300">Tags (comma separated)</Label>
+                  <Input
+                    id="file-tags"
+                    placeholder="e.g. documentation, sales"
+                    value={fileTags}
+                    onChange={(e) => setFileTags(e.target.value)}
+                    className="bg-slate-800 border-slate-700 text-white text-xs"
+                  />
+                </div>
+
                 <Button 
                   type="submit" 
                   disabled={!selectedFile || uploading} 
@@ -334,6 +413,61 @@ export default function AiKnowledgePage() {
                     required
                     className="bg-slate-800 border-slate-700 text-white text-xs font-mono"
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="web-category" className="text-xs text-slate-300">Category</Label>
+                  <select
+                    id="web-category"
+                    value={webCategory}
+                    onChange={(e) => setWebCategory(e.target.value)}
+                    className="w-full rounded-md border border-slate-700 bg-slate-800 text-white text-xs px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="web-tags" className="text-xs text-slate-300">Tags (comma separated)</Label>
+                  <Input
+                    id="web-tags"
+                    placeholder="e.g. pricing, website"
+                    value={webTags}
+                    onChange={(e) => setWebTags(e.target.value)}
+                    className="bg-slate-800 border-slate-700 text-white text-xs"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="crawl-depth" className="text-xs text-slate-300">Crawl Depth</Label>
+                    <select
+                      id="crawl-depth"
+                      value={crawlDepth}
+                      onChange={(e) => setCrawlDepth(Number(e.target.value))}
+                      className="w-full rounded-md border border-slate-700 bg-slate-800 text-white text-xs px-3.5 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    >
+                      <option value={1}>1 (Single page)</option>
+                      <option value={2}>2 (Depth 2)</option>
+                      <option value={3}>3 (Depth 3)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="max-pages" className="text-xs text-slate-300">Max Pages</Label>
+                    <Input
+                      id="max-pages"
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={maxPages}
+                      onChange={(e) => setMaxPages(Number(e.target.value))}
+                      className="bg-slate-800 border-slate-700 text-white text-xs"
+                    />
+                  </div>
                 </div>
 
                 <Button 
@@ -401,13 +535,33 @@ export default function AiKnowledgePage() {
                     <tbody className="divide-y divide-slate-850/60">
                       {documents.map((doc) => (
                         <tr key={doc.id} className="hover:bg-slate-900/20 transition-colors">
-                          <td className="px-4 py-3.5 max-w-[200px] truncate">
-                            <span className="font-semibold text-slate-200 block truncate">{doc.title}</span>
-                            <span className="text-[10px] text-slate-500 block mt-0.5">
+                          <td className="px-4 py-3.5 max-w-[240px]">
+                            <span className="font-semibold text-slate-200 block truncate" title={doc.title}>{doc.title}</span>
+                            {doc.source_url && (
+                              <a 
+                                href={doc.source_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="text-[10px] text-indigo-400 hover:underline block truncate mt-0.5"
+                              >
+                                {doc.source_url}
+                              </a>
+                            )}
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              <Badge className="bg-slate-800 text-slate-300 border border-slate-700/50 hover:bg-slate-800 text-[9px] px-1.5 py-0">
+                                {doc.category || "General"}
+                              </Badge>
+                              {doc.tags && doc.tags.map((tag) => (
+                                <Badge key={tag} className="bg-indigo-950/40 text-indigo-300 border border-indigo-500/20 hover:bg-indigo-950/40 text-[9px] px-1.5 py-0">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                            <span className="text-[9px] text-slate-500 block mt-1.5">
                               Added {new Date(doc.created_at).toLocaleDateString()}
                             </span>
                             {doc.status === "failed" && doc.error_message && (
-                              <span className="text-[10px] text-rose-400/90 block mt-1 leading-normal max-w-[200px] whitespace-pre-wrap">
+                              <span className="text-[10px] text-rose-400/90 block mt-1 leading-normal whitespace-pre-wrap">
                                 Error: {doc.error_message}
                               </span>
                             )}

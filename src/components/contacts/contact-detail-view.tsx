@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag, ContactNote, CustomField, ContactCustomValue, Deal } from '@/types';
@@ -344,9 +345,20 @@ export function ContactDetailView({
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <SheetTitle className="text-white truncate">
-                    {contact.name || 'Unknown'}
-                  </SheetTitle>
+                  <div className="flex items-center justify-between gap-2">
+                    <SheetTitle className="text-white truncate">
+                      {contact.name || 'Unknown'}
+                    </SheetTitle>
+                    <Link href={`/contacts/${contact.id}`}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7 border-slate-700 hover:bg-slate-800 hover:text-white text-slate-300 shrink-0"
+                      >
+                        Open Full Profile
+                      </Button>
+                    </Link>
+                  </div>
                   <SheetDescription className="text-slate-400 text-xs mt-0.5">
                     Contact details
                   </SheetDescription>

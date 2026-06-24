@@ -5,6 +5,8 @@ export interface Profile {
   email: string;
   avatar_url?: string;
   role: string;
+  availability?: 'online' | 'busy' | 'away';
+  last_seen_at?: string;
   /**
    * Opted-in beta feature keys for this account. The column survives
    * for future beta gates; no current feature reads it (Flows was
@@ -24,6 +26,20 @@ export interface Contact {
   email?: string;
   company?: string;
   avatar_url?: string;
+  website?: string;
+  industry?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  language?: string;
+  timezone?: string;
+  business_type?: string;
+  lead_source?: string;
+  status?: string;
+  owner_id?: string;
+  last_activity_at?: string;
+  preferred_language?: string;
   created_at: string;
   updated_at: string;
 }
@@ -77,6 +93,14 @@ export interface Conversation {
   last_message_text?: string;
   last_message_at?: string;
   unread_count: number;
+  pinned?: boolean;
+  favorite?: boolean;
+  spam?: boolean;
+  blocked?: boolean;
+  sla_first_response_time?: number;
+  sla_avg_response_time?: number;
+  sla_resolution_time?: number;
+  sla_breached?: boolean;
   created_at: string;
   updated_at: string;
   contact?: Contact;
@@ -108,6 +132,7 @@ export interface Message {
   status: MessageStatus;
   created_at: string;
   reply_to_message_id?: string;
+  is_internal?: boolean;
   /**
    * Only set when `content_type === 'interactive'` — the stable id of
    * the button or list row the customer tapped. The Flows engine uses
@@ -176,6 +201,7 @@ export interface QuickReply {
   user_id: string;
   shortcut: string;
   message_text: string;
+  category?: string;
   created_at: string;
 }
 
@@ -220,11 +246,45 @@ export interface Deal {
   notes?: string;
   expected_close_date?: string;
   status?: DealStatus;
+  probability?: number;
+  expected_revenue?: number;
+  priority?: 'low' | 'medium' | 'high';
+  services?: string[];
+  proposal_id?: string;
+  quotation_id?: string;
   created_at: string;
   updated_at?: string;
   contact?: Contact;
   stage?: PipelineStage;
   assignee?: Profile;
+}
+
+export interface Task {
+  id: string;
+  user_id: string;
+  contact_id?: string;
+  assigned_to?: string;
+  title: string;
+  description?: string;
+  priority: 'low' | 'medium' | 'high';
+  due_date?: string;
+  status: 'pending' | 'completed';
+  recurring?: string;
+  created_at: string;
+  updated_at: string;
+  contact?: Contact;
+  assignee?: Profile;
+}
+
+export interface CustomerFile {
+  id: string;
+  user_id: string;
+  contact_id: string;
+  file_name: string;
+  file_path: string;
+  file_size?: number;
+  file_type?: string;
+  created_at: string;
 }
 
 export type BroadcastStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
@@ -437,4 +497,51 @@ export interface AutomationLog {
   error_message?: string | null;
   created_at: string;
   contact?: Contact;
+}
+
+export interface Invoice {
+  id: string;
+  user_id: string;
+  contact_id: string;
+  invoice_number: string;
+  amount: number;
+  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
+  due_date?: string;
+  services?: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Payment {
+  id: string;
+  user_id: string;
+  contact_id: string;
+  invoice_id?: string;
+  amount: number;
+  payment_method?: string;
+  transaction_id?: string;
+  payment_date?: string;
+  status: 'pending' | 'completed' | 'failed';
+  created_at: string;
+}
+
+export interface Campaign {
+  id: string;
+  user_id: string;
+  name: string;
+  type: 'whatsapp' | 'email' | 'sms';
+  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'failed';
+  sent_count: number;
+  delivery_count: number;
+  read_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CrmSettings {
+  id: string;
+  user_id: string;
+  settings: Record<string, any>;
+  created_at: string;
+  updated_at: string;
 }

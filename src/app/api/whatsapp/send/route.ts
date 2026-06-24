@@ -47,6 +47,7 @@ export async function POST(request: Request) {
       template_name,
       template_params,
       reply_to_message_id,
+      is_internal,
     } = body
 
     if (!conversation_id || !message_type) {
@@ -83,6 +84,44 @@ export async function POST(request: Request) {
         { error: 'Conversation not found' },
         { status: 404 }
       )
+    }
+
+    if (is_internal) {
+      const { data: messageRecord, error: msgError } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id,
+          sender_type: 'agent',
+          content_type: 'text',
+          content_text: content_text,
+          status: 'sent',
+          is_internal: true,
+          reply_to_message_id: reply_to_message_id || null,
+        })
+        .select()
+        .single()
+
+      if (msgError) {
+        console.error('Error inserting internal message:', msgError)
+        return NextResponse.json(
+          { error: `Failed to save internal note: ${msgError.message}` },
+          { status: 500 }
+        )
+      }
+
+      await supabase
+        .from('conversations')
+        .update({
+          last_message_text: content_text || '[Internal Note]',
+          last_message_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', conversation_id)
+
+      return NextResponse.json({
+        success: true,
+        message_id: messageRecord.id,
+      })
     }
 
     const contact = conversation.contact

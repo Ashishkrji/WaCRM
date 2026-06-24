@@ -397,6 +397,12 @@ export default function AiRouterPage() {
 
         {/* Action Quick Navigation Links */}
         <div className="flex items-center gap-2 shrink-0 self-start md:self-center">
+          <Link href="/ai-agents">
+            <Button variant="outline" size="sm" className="bg-slate-900 border-slate-800 hover:bg-slate-800 hover:text-white flex items-center gap-1.5 text-xs text-slate-300">
+              <Bot className="h-3.5 w-3.5" />
+              AI Agents
+            </Button>
+          </Link>
           <Link href="/ai-knowledge">
             <Button variant="outline" size="sm" className="bg-slate-900 border-slate-800 hover:bg-slate-800 hover:text-white flex items-center gap-1.5 text-xs text-slate-300">
               <BookOpen className="h-3.5 w-3.5" />

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { dbService } from '@/services/db';
 import { headers } from 'next/headers';
 
 export async function POST(request: Request) {
@@ -11,44 +11,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
     }
 
-    const { db } = await connectToDatabase();
     const headerList = await headers();
     
     const ipAddress = headerList.get('x-forwarded-for') || '127.0.0.1';
     const userAgent = headerList.get('user-agent') || 'unknown';
 
-    // 1. Log the audit event in auth_events
-    await db.collection('auth_events').insertOne({
-      user_id: userId || null,
+    // 1. Log the audit event via dbService
+    await dbService.ai.logAuthEvent({
+      userId: userId || null,
       email,
-      event_type: event, // 'login' | 'signup'
+      eventType: event, // 'login' | 'signup'
       status, // 'success' | 'failed'
-      ip_address: ipAddress,
-      user_agent: userAgent,
-      error_message: error || null,
-      created_at: new Date(),
+      ipAddress,
+      userAgent,
+      errorMessage: error || null,
     });
 
-    // 2. If it is a successful login or signup and userId is present, upsert user account info
+    // 2. If it is a successful login or signup and userId is present, upsert user account info via dbService
     if (status === 'success' && userId) {
-      const userDoc: any = {
-        id: userId,
-        email: email,
-        updated_at: new Date(),
-      };
-      if (fullName) {
-        userDoc.full_name = fullName;
-      }
-      await db.collection('users').updateOne(
-        { id: userId },
-        {
-          $set: userDoc,
-          $setOnInsert: {
-            created_at: new Date(),
-          }
-        },
-        { upsert: true }
-      );
+      await dbService.ai.upsertUser(userId, {
+        email,
+        fullName: fullName || null,
+      });
     }
 
     return NextResponse.json({ success: true }, { status: 200 });

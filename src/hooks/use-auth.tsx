@@ -20,12 +20,9 @@ interface Profile {
   permissions: string[];
   status: "active" | "suspended";
   last_login_at: string | null;
-  /**
-   * Opted-in beta feature keys for this account. No current feature
-   * reads this — Flows was the last user and went to soft-GA in PR
-   * #134 — but the column survives for future beta gates.
-   */
   beta_features: string[];
+  availability?: 'online' | 'busy' | 'away';
+  last_seen_at?: string | null;
 }
 
 interface AuthContextValue {
@@ -80,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Try fetching with permissions, status, and last_login_at first
       let { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, email, avatar_url, role, beta_features, permissions, status, last_login_at")
+        .select("id, full_name, email, avatar_url, role, beta_features, permissions, status, last_login_at, availability, last_seen_at")
         .eq("user_id", userId)
         .maybeSingle();
 

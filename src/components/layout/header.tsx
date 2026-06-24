@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
-import { LogOut, Menu, Settings as SettingsIcon, User, Building2, ChevronDown, Sparkles, Plus, PlusCircle, Check } from "lucide-react";
+import { LogOut, Menu, Settings as SettingsIcon, User, Building2, ChevronDown, Sparkles, Plus, PlusCircle, Check, Search, Bell } from "lucide-react";
 import {
   Avatar,
   AvatarFallback,
@@ -19,9 +19,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
-import { useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { GlobalSearchModal } from "./global-search-modal";
+import { cn } from "@/lib/utils";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -67,6 +68,7 @@ interface HeaderProps {
 
 export function Header({ onOpenSidebar }: HeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, profile, signOut } = useAuth();
   const title = getPageTitle(pathname);
   const supabase = createClient();
@@ -75,6 +77,76 @@ export function Header({ onOpenSidebar }: HeaderProps) {
   const [activeWorkspace, setActiveWorkspace] = useState<any | null>(null);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [isAddingWorkspace, setIsAddingWorkspace] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  // Load live notifications
+  useEffect(() => {
+    if (!user) return;
+
+    async function loadNotifications() {
+      try {
+        const list: any[] = [];
+        
+        // 1. Overdue/pending tasks
+        const { data: tasksData } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('status', 'pending')
+          .limit(3);
+
+        if (tasksData) {
+          tasksData.forEach(t => {
+            list.push({
+              id: t.id,
+              title: `CRM Task: ${t.title}`,
+              body: t.description || 'Action pending.',
+              time: t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No due date',
+            });
+          });
+        }
+
+        // 2. Upcoming meetings
+        const { data: meetingsData } = await supabase
+          .from('meeting_bookings')
+          .select('*')
+          .eq('status', 'scheduled')
+          .limit(3);
+
+        if (meetingsData) {
+          meetingsData.forEach(m => {
+            list.push({
+              id: m.id,
+              title: `Meeting: ${m.title || 'Client Call'}`,
+              body: `Discussion scheduled.`,
+              time: new Date(m.start_time).toLocaleDateString(),
+            });
+          });
+        }
+
+        setNotifications(list);
+      } catch (err) {
+        console.error('Failed to load notifications:', err);
+      }
+    }
+
+    loadNotifications();
+  }, [user, supabase]);
+
+  const updateAvailability = async (status: 'online' | 'busy' | 'away') => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ availability: status, last_seen_at: new Date().toISOString() })
+      .eq('id', user.id);
+
+    if (error) {
+      toast.error('Failed to update availability status');
+    } else {
+      toast.success(`Status set to ${status.toUpperCase()}`);
+      router.refresh();
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -244,23 +316,104 @@ export function Header({ onOpenSidebar }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Spotlight Search Trigger */}
+        <button
+          type="button"
+          onClick={() => setIsSearchOpen(true)}
+          className="hidden md:flex items-center gap-2.5 w-60 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-900/50 px-3 py-1.5 text-xs text-slate-450 hover:text-slate-300 transition-all focus:outline-none cursor-pointer"
+        >
+          <Search className="h-3.5 w-3.5 text-slate-500" />
+          <span className="flex-1 text-left">Search anything...</span>
+          <kbd className="flex h-4 items-center gap-0.5 rounded bg-slate-900 px-1 text-[8px] font-bold text-slate-600 border border-slate-800 font-mono">
+            <span>⌘</span>
+            <span>K</span>
+          </kbd>
+        </button>
+
+        {/* Mobile Search Icon Button */}
+        <button
+          type="button"
+          onClick={() => setIsSearchOpen(true)}
+          className="flex md:hidden h-8 w-8 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/40 hover:bg-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer"
+        >
+          <Search className="h-3.5 w-3.5" />
+        </button>
+
+        {/* Notification Bell */}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                className="relative h-8 w-8 flex items-center justify-center rounded-xl border border-slate-800 bg-slate-900/40 hover:bg-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer"
+              >
+                <Bell className="h-3.5 w-3.5" />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-rose-550 text-[8px] font-bold text-white animate-pulse">
+                    {notifications.length}
+                  </span>
+                )}
+              </button>
+            }
+          />
+          <DropdownMenuContent align="end" className="w-72 bg-slate-905 border-slate-800 text-slate-250 p-2 space-y-2">
+            <div className="flex items-center justify-between px-2 py-1 border-b border-slate-800">
+              <span className="text-[10px] font-extrabold text-white uppercase tracking-wider">Alerts & Actions</span>
+              {notifications.length > 0 && (
+                <button
+                  onClick={() => setNotifications([])}
+                  className="text-[9px] text-primary hover:text-primary/80 font-bold uppercase"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            {notifications.length === 0 ? (
+              <div className="text-center py-5 text-slate-550 text-[11px]">
+                No new notifications. Everything clear!
+              </div>
+            ) : (
+              <div className="space-y-1 max-h-52 overflow-y-auto pr-1 scrollbar-thin">
+                {notifications.map(n => (
+                  <div key={n.id} className="bg-slate-950/60 p-2 rounded-lg border border-slate-850 text-[11px] space-y-0.5">
+                    <div className="flex justify-between items-start gap-1">
+                      <span className="font-bold text-slate-200 leading-snug">{n.title}</span>
+                      <span className="text-[8px] text-slate-500 font-mono shrink-0">{n.time}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-450 leading-normal">{n.body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         {/* User Account Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger
             className="flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-slate-800/70 focus:bg-slate-800/70 focus:outline-none data-popup-open:bg-slate-800/70 sm:gap-3 sm:pl-1 sm:pr-3"
             aria-label="Open account menu"
           >
-            <Avatar className="size-8">
-              {profile?.avatar_url ? (
-                <AvatarImage
-                  src={profile.avatar_url}
-                  alt={profile.full_name ?? "Avatar"}
-                />
-              ) : null}
-              <AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">
-                {initial}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar className="size-8">
+                {profile?.avatar_url ? (
+                  <AvatarImage
+                    src={profile.avatar_url}
+                    alt={profile.full_name ?? "Avatar"}
+                  />
+                ) : null}
+                <AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">
+                  {initial}
+                </AvatarFallback>
+              </Avatar>
+              <span className={cn(
+                "absolute bottom-0 right-0 block h-2 w-2 rounded-full ring-1 ring-slate-950",
+                profile?.availability === 'online' ? 'bg-emerald-555' :
+                profile?.availability === 'busy' ? 'bg-rose-555' :
+                profile?.availability === 'away' ? 'bg-amber-555' :
+                'bg-slate-500'
+              )} />
+            </div>
             <span className="hidden text-sm font-medium text-white sm:inline">
               {profile?.full_name ?? "User"}
             </span>
@@ -278,6 +431,33 @@ export function Header({ onOpenSidebar }: HeaderProps) {
                 {profile?.email ?? ""}
               </p>
             </div>
+
+            <div className="px-2 py-1.5 border-t border-b border-slate-850 my-1 bg-slate-950/20">
+              <span className="text-[9px] text-slate-500 uppercase font-extrabold block mb-1 tracking-wider">Set Availability</span>
+              <div className="flex items-center gap-1">
+                {([
+                  { key: 'online', label: 'Online', color: 'bg-emerald-500' },
+                  { key: 'busy', label: 'Busy', color: 'bg-rose-500' },
+                  { key: 'away', label: 'Away', color: 'bg-amber-500' },
+                ] as const).map(status => (
+                  <button
+                    key={status.key}
+                    type="button"
+                    onClick={() => updateAvailability(status.key)}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-1 text-[10px] py-1 rounded border transition-all font-semibold cursor-pointer",
+                      profile?.availability === status.key
+                        ? "bg-slate-800 text-white border-slate-700"
+                        : "bg-transparent text-slate-400 border-transparent hover:bg-slate-800/45 hover:text-slate-300"
+                    )}
+                  >
+                    <span className={cn("size-1.5 rounded-full shrink-0", status.color)} />
+                    {status.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <DropdownMenuSeparator className="bg-slate-800" />
             <DropdownMenuItem
               render={
@@ -325,6 +505,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <GlobalSearchModal isOpen={isSearchOpen} onOpenChange={setIsSearchOpen} />
     </header>
   );
 }

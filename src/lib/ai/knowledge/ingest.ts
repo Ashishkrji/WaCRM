@@ -9,7 +9,7 @@
  *   - Website content (fetched as text)
  */
 
-import { connectToDatabase } from '@/lib/mongodb'
+import { dbService } from '@/services/db'
 import { generateEmbedding } from './embeddings'
 
 // ============================================================
@@ -63,6 +63,9 @@ export interface IngestOptions {
   knowledgeBaseId: string
   content: string
   title?: string
+  category?: string
+  tags?: string[]
+  sourceUrl?: string | null
 }
 
 /**
@@ -75,13 +78,10 @@ export async function ingestText(options: IngestOptions): Promise<number> {
   const { userId, knowledgeBaseId, content } = options
   
   try {
-    const { db } = await connectToDatabase()
-
-    // Mark as processing
-    await db.collection('knowledge_base').updateOne(
-      { id: knowledgeBaseId },
-      { $set: { status: 'processing', updated_at: new Date() } }
-    )
+    // Mark as processing via dbService
+    await dbService.ai.updateKnowledgeDoc(knowledgeBaseId, {
+      status: 'processing',
+    })
 
     const chunks = chunkText(content)
     const provider = (process.env.AI_PROVIDER || 'nvidia').toLowerCase()
@@ -90,6 +90,10 @@ export async function ingestText(options: IngestOptions): Promise<number> {
       process.env.OPENAI_EMBEDDING_MODEL ||
       'nvidia/nv-embed-v2'
 
+    const category = options.category || 'General'
+    const tags = options.tags || []
+    const sourceUrl = options.sourceUrl || null
+
     let successCount = 0
     const rows: Array<{
       user_id: string
@@ -97,6 +101,9 @@ export async function ingestText(options: IngestOptions): Promise<number> {
       content: string
       chunk_index: number
       embedding: number[] | null
+      category: string
+      tags: string[]
+      source_url: string | null
       metadata: Record<string, unknown>
       created_at: Date
     }> = []
@@ -110,45 +117,39 @@ export async function ingestText(options: IngestOptions): Promise<number> {
         content: chunk,
         chunk_index: i,
         embedding,
+        category,
+        tags,
+        source_url: sourceUrl,
         metadata: { provider, chunk_index: i, total_chunks: chunks.length },
         created_at: new Date(),
       })
       successCount++
     }
 
-    // Delete existing embeddings (if re-ingesting)
-    await db.collection('knowledge_embeddings').deleteMany({
-      knowledge_base_id: knowledgeBaseId
-    })
+    // Delete existing embeddings via dbService
+    await dbService.ai.deleteKnowledgeEmbeddings(knowledgeBaseId)
 
-    // Batch insert chunks to MongoDB
+    // Batch insert chunks to MongoDB via dbService
     if (rows.length > 0) {
-      await db.collection('knowledge_embeddings').insertMany(rows)
+      await dbService.ai.insertKnowledgeEmbeddings(rows)
     }
 
-    // Mark as ready
-    await db.collection('knowledge_base').updateOne(
-      { id: knowledgeBaseId },
-      {
-        $set: {
-          status: 'ready',
-          chunk_count: successCount,
-          embedding_model: embeddingModel,
-          updated_at: new Date(),
-        }
-      }
-    )
+    // Mark as ready via dbService
+    await dbService.ai.updateKnowledgeDoc(knowledgeBaseId, {
+      status: 'ready',
+      chunk_count: successCount,
+      embedding_model: embeddingModel,
+    })
 
     return successCount
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[AI/ingest] ingestText failed:', msg)
     try {
-      const { db } = await connectToDatabase()
-      await db.collection('knowledge_base').updateOne(
-        { id: knowledgeBaseId },
-        { $set: { status: 'failed', error_message: msg, updated_at: new Date() } }
-      )
+      await dbService.ai.updateKnowledgeDoc(knowledgeBaseId, {
+        status: 'failed',
+        error_message: msg,
+      })
     } catch (dbErr) {
       console.error('[AI/ingest] Failed to update document failure status:', dbErr)
     }
@@ -207,11 +208,111 @@ export async function deleteDocumentEmbeddings(
   knowledgeBaseId: string
 ): Promise<void> {
   try {
-    const { db } = await connectToDatabase()
-    await db.collection('knowledge_embeddings').deleteMany({
-      knowledge_base_id: knowledgeBaseId
-    })
+    await dbService.ai.deleteKnowledgeEmbeddings(knowledgeBaseId)
   } catch (error) {
     console.error('[AI/ingest] deleteDocumentEmbeddings failed:', error)
   }
+}
+
+/**
+ * Recursively crawl a website starting at startUrl up to maxDepth and maxPages.
+ * Extracts title, clean text content, and returns an array of page objects.
+ */
+export async function crawlWebsite(
+  startUrl: string,
+  maxDepth = 1,
+  maxPages = 10
+): Promise<Array<{ url: string; content: string; title: string }>> {
+  const pages: Array<{ url: string; content: string; title: string }> = []
+  const visited = new Set<string>()
+  const queue: Array<{ url: string; depth: number }> = [{ url: startUrl, depth: 1 }]
+
+  let parsedStartUrl: URL
+  try {
+    parsedStartUrl = new URL(startUrl)
+  } catch {
+    throw new Error(`Invalid start URL: ${startUrl}`)
+  }
+
+  const hostname = parsedStartUrl.hostname
+
+  while (queue.length > 0 && pages.length < maxPages) {
+    const current = queue.shift()!
+    
+    // Normalize URL by removing hash fragment
+    let urlToFetch = current.url
+    try {
+      const u = new URL(urlToFetch)
+      u.hash = ''
+      urlToFetch = u.toString()
+    } catch {
+      continue
+    }
+
+    if (visited.has(urlToFetch)) continue
+    visited.add(urlToFetch)
+
+    try {
+      console.log(`[Crawler] Fetching: ${urlToFetch} at depth ${current.depth}`)
+      const res = await fetch(urlToFetch, {
+        headers: {
+          'User-Agent': 'WaCRM-KnowledgeBot/1.0 (+https://wacrm.tech)',
+          Accept: 'text/html,text/plain',
+        },
+        signal: AbortSignal.timeout(10_000),
+      })
+
+      if (!res.ok) continue
+      const html = await res.text()
+
+      // Extract Title
+      const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+      const title = titleMatch ? titleMatch[1].trim() : 'Scraped Page'
+
+      // Extract Clean Text
+      const text = html
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+
+      if (text.length > 0) {
+        pages.push({ url: urlToFetch, content: text, title })
+      }
+
+      // If we haven't reached maxDepth, extract and queue links
+      if (current.depth < maxDepth) {
+        const linkMatches = html.matchAll(/href="([^"]+)"/gi)
+        for (const match of linkMatches) {
+          const href = match[1]
+          try {
+            const absoluteUrl = new URL(href, urlToFetch)
+            // Only crawl same domain and http/https schemes
+            if (
+              absoluteUrl.hostname === hostname &&
+              ['http:', 'https:'].includes(absoluteUrl.protocol)
+            ) {
+              const cleanedUrl = absoluteUrl.toString().split('#')[0]
+              if (!visited.has(cleanedUrl) && !queue.some(q => q.url === cleanedUrl)) {
+                queue.push({ url: cleanedUrl, depth: current.depth + 1 })
+              }
+            }
+          } catch {
+            // skip invalid URLs
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[Crawler] Failed to fetch ${urlToFetch}:`, err)
+    }
+  }
+
+  return pages
 }

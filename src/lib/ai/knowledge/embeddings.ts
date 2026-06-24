@@ -6,7 +6,7 @@
  *   2. searchKnowledge(userId, queryText, options) — RAG vector similarity search using MongoDB Atlas
  */
 
-import { connectToDatabase } from '@/lib/mongodb'
+import { dbService } from '@/services/db'
 import { tryGetAIProvider } from '../provider-factory'
 import type { KnowledgeChunk } from '../types'
 
@@ -39,16 +39,23 @@ export interface SearchOptions {
   threshold?: number
   /** Maximum number of chunks to return. Default: 5 */
   topK?: number
+  /** Filter by category, e.g. 'Pricing', 'Services' */
+  category?: string
+  /** Filter by tags */
+  tags?: string[]
 }
 
+interface CacheEntry {
+  chunks: KnowledgeChunk[]
+  timestamp: number
+}
+
+const ragCache = new Map<string, CacheEntry>()
+const CACHE_TTL_MS = 60000 // 1 minute cache TTL
+
 /**
- * Search the knowledge base for chunks semantically similar to queryText.
- * Uses MongoDB Atlas Vector Search.
- *
- * Returns an empty array if:
- *   - The AI provider is not configured (no API key)
- *   - The user has no knowledge base documents
- *   - No chunks exceed the similarity threshold
+ * Search the knowledge base for chunks semantically and keyword similar to queryText.
+ * Uses MongoDB Atlas Hybrid Vector & Keyword Search via the Database Service Layer.
  */
 export async function searchKnowledge(
   userId: string,
@@ -57,6 +64,18 @@ export async function searchKnowledge(
 ): Promise<KnowledgeChunk[]> {
   const threshold = options.threshold ?? 0.7
   const topK = options.topK ?? 5
+  const category = options.category
+  const tags = options.tags || []
+
+  // Check in-memory cache first
+  const cacheKey = `${userId}:${queryText}:${category || ''}:${tags.join(',')}:${topK}`
+  const cached = ragCache.get(cacheKey)
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    console.log('[RAGCache] Cache hit for:', queryText)
+    return cached.chunks
+  }
+
+  const startTime = performance.now()
 
   // Generate query embedding
   const embedding = await generateEmbedding(queryText)
@@ -65,46 +84,32 @@ export async function searchKnowledge(
   }
 
   try {
-    const { db } = await connectToDatabase()
+    // Search using MongoDB Atlas via dbService
+    const results = await dbService.ai.hybridSearchKnowledge(
+      userId,
+      embedding,
+      queryText,
+      { category, tags },
+      topK
+    )
 
-    // Query MongoDB Atlas using the $vectorSearch aggregation stage
-    const results = await db.collection('knowledge_embeddings').aggregate([
-      {
-        $vectorSearch: {
-          index: 'vector_index',
-          path: 'embedding',
-          queryVector: embedding,
-          numCandidates: 100,
-          limit: topK,
-          filter: {
-            user_id: userId
-          }
-        }
-      },
-      {
-        $project: {
-          _id: 1,
-          knowledge_base_id: 1,
-          content: 1,
-          similarity: { $meta: 'vectorSearchScore' }
-        }
-      }
-    ]).toArray()
-
-    if (!results || results.length === 0) return []
+    if (!results || results.length === 0) {
+      // Log failed search
+      const latencyMs = Math.round(performance.now() - startTime)
+      void dbService.ai.logKnowledgeSearch(userId, queryText, 0, latencyMs, false)
+        .catch(err => console.warn('[AI/embeddings] logSearch failed:', err))
+      return []
+    }
 
     // Fetch source titles for context
     const kbIds = [...new Set(results.map(r => r.knowledge_base_id))]
-    const kbDocs = await db.collection('knowledge_base')
-      .find({ id: { $in: kbIds } })
-      .project({ id: 1, title: 1 })
-      .toArray()
+    const kbDocs = await dbService.ai.getKnowledgeDocTitles(kbIds)
 
     const titleMap = new Map<string, string>(
       kbDocs.map(d => [d.id, d.title])
     )
 
-    return results
+    const processedResults = results
       .filter(row => row.similarity >= threshold)
       .map(row => ({
         id: row._id.toString(),
@@ -112,8 +117,32 @@ export async function searchKnowledge(
         source: titleMap.get(row.knowledge_base_id) ?? 'Knowledge Base',
         similarity: row.similarity,
       }))
+
+    const latencyMs = Math.round(performance.now() - startTime)
+    const success = processedResults.length > 0
+
+    // Log search analytics asynchronously
+    void dbService.ai.logKnowledgeSearch(userId, queryText, processedResults.length, latencyMs, success)
+      .catch(err => console.warn('[AI/embeddings] logSearch failed:', err))
+
+    // Log chunk usage statistics
+    processedResults.forEach(row => {
+      void dbService.ai.logKnowledgeUsage(userId, row.id)
+        .catch(err => console.warn('[AI/embeddings] logUsage failed:', err))
+    })
+
+    // Update Cache
+    ragCache.set(cacheKey, {
+      chunks: processedResults,
+      timestamp: Date.now(),
+    })
+
+    return processedResults
   } catch (err) {
-    console.error('[AI/embeddings] searchKnowledge Atlas Vector Search failed:', err)
+    console.error('[AI/embeddings] searchKnowledge Atlas Search failed:', err)
+    const latencyMs = Math.round(performance.now() - startTime)
+    void dbService.ai.logKnowledgeSearch(userId, queryText, 0, latencyMs, false)
+      .catch(e => console.warn('[AI/embeddings] logSearch failed:', e))
     return []
   }
 }

@@ -26,28 +26,16 @@
  *   - The webhook must not be blocked by AI failures.
  */
 
-import { createClient } from '@supabase/supabase-js'
 import { tryGetAIProvider } from './provider-factory'
 import { searchKnowledge, formatKnowledgeForPrompt } from './knowledge/embeddings'
-import { getContactMemory, updateContactMemory, formatMemoryForPrompt } from './memory'
+import { getContactMemory, updateContactMemory, formatMemoryForPrompt, getUnifiedMemoryContext } from './memory'
 import { analyzeIntent, quickHumanRequestCheck } from './intent'
 import { maybeGenerateSummary } from './summary'
 import { engineSendText } from '@/lib/automations/meta-send'
-import { connectToDatabase } from '@/lib/mongodb'
+import { dbService } from '@/services/db'
 import { logPrompt, logSentimentAnalysis } from './mongodb-logger'
+import { DEFAULT_AGENTS } from './agents/defaults'
 import type { AIDispatchInput, AIDispatchResult, AIMessage } from './types'
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _admin: any = null
-function supabaseAdmin() {
-  if (!_admin) {
-    _admin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _admin
-}
 
 // ============================================================
 // Configuration
@@ -129,6 +117,9 @@ Specifically extract:
 - Business Goals
 - Current Website URL
 - Marketing Requirements
+- Preferred Language (e.g. English, Hindi)
+- Preferred Services (e.g. Website Dev, SEO, GST Registration)
+- Communication Style (e.g. Professional, Casual)
 
 Return ONLY a JSON object representing these facts. If any fact is unknown, do not include it. Merge with existing facts:
 {
@@ -140,7 +131,10 @@ Return ONLY a JSON object representing these facts. If any fact is unknown, do n
   "timeline": "...",
   "goals": "...",
   "website": "...",
-  "marketing_requirements": "..."
+  "marketing_requirements": "...",
+  "preferred_language": "...",
+  "preferred_services": "...",
+  "communication_style": "..."
 }
 Do not output markdown code blocks, explanations, or trailing commas.`;
 
@@ -176,26 +170,20 @@ async function executeBookMeeting(
   const endTime = new Date(new Date(startTime).getTime() + 30 * 60 * 1000).toISOString()
   const meetingLink = 'https://meet.google.com/mjw-tech-consultation'
 
-  const { data, error } = await supabaseAdmin()
-    .from('meeting_bookings')
-    .insert({
-      user_id: userId,
-      contact_id: contactId,
-      conversation_id: conversationId,
+  try {
+    return await dbService.business.createMeetingBooking(
+      userId,
+      contactId,
+      conversationId,
       title,
-      start_time: startTime,
-      end_time: endTime,
-      meeting_link: meetingLink,
-      status: 'scheduled'
-    })
-    .select('id')
-    .single()
-
-  if (error) {
-    console.error('[AI/engine] executeBookMeeting error:', error.message)
+      startTime,
+      endTime,
+      meetingLink
+    )
+  } catch (error: any) {
+    console.error('[AI/engine] executeBookMeeting error:', error.message || error)
     return null
   }
-  return data?.id || null
 }
 
 async function executeCreateQuote(
@@ -209,25 +197,19 @@ async function executeCreateQuote(
   const items = payload.items || [{ desc: 'MaaJanki Development Package', price: 25000 }]
   const totalAmount = items.reduce((sum: number, item: any) => sum + (Number(item.price) || 0), 0)
 
-  const { data, error } = await supabaseAdmin()
-    .from('quotation_requests')
-    .insert({
-      user_id: userId,
-      contact_id: contactId,
-      conversation_id: conversationId,
-      service_required: serviceRequired,
+  try {
+    return await dbService.business.createQuotationRequest(
+      userId,
+      contactId,
+      conversationId,
+      serviceRequired,
       items,
-      total_amount: totalAmount,
-      status: 'pending'
-    })
-    .select('id')
-    .single()
-
-  if (error) {
-    console.error('[AI/engine] executeCreateQuote error:', error.message)
+      totalAmount
+    )
+  } catch (error: any) {
+    console.error('[AI/engine] executeCreateQuote error:', error.message || error)
     return null
   }
-  return data?.id || null
 }
 
 async function executeCreateProposal(
@@ -240,24 +222,18 @@ async function executeCreateProposal(
   const serviceRequired = payload.service || 'SEO & Marketing Services'
   const details = payload.details || { goals: 'Increase leads and search traffic' }
 
-  const { data, error } = await supabaseAdmin()
-    .from('proposal_requests')
-    .insert({
-      user_id: userId,
-      contact_id: contactId,
-      conversation_id: conversationId,
-      service_required: serviceRequired,
-      details,
-      status: 'pending'
-    })
-    .select('id')
-    .single()
-
-  if (error) {
-    console.error('[AI/engine] executeCreateProposal error:', error.message)
+  try {
+    return await dbService.business.createProposalRequest(
+      userId,
+      contactId,
+      conversationId,
+      serviceRequired,
+      details
+    )
+  } catch (error: any) {
+    console.error('[AI/engine] executeCreateProposal error:', error.message || error)
     return null
   }
-  return data?.id || null
 }
 
 async function extractAndSaveFacts(
@@ -312,10 +288,7 @@ async function extractAndSaveFacts(
     }
 
     if (Object.keys(updates).length > 0) {
-      await supabaseAdmin()
-        .from('contacts')
-        .update(updates)
-        .eq('id', contactId)
+      await dbService.business.updateContact(contactId, updates)
     }
 
     return mergedFacts
@@ -350,54 +323,31 @@ async function evaluateAndCreateLead(
     const scoring = JSON.parse(jsonMatch[0]) as { score: number; tier: 'hot' | 'warm' | 'cold'; reasoning: string }
 
     // Save lead score
-    await supabaseAdmin()
-      .from('lead_scores')
-      .upsert({
-        user_id: userId,
-        contact_id: contactId,
-        score: scoring.score,
-        tier: scoring.tier,
-        reasoning: scoring.reasoning,
-        provider: provider.name,
-        scored_at: new Date().toISOString()
-      }, { onConflict: 'user_id,contact_id' })
+    await dbService.business.upsertLeadScore(
+      userId,
+      contactId,
+      scoring.score,
+      scoring.tier,
+      scoring.reasoning,
+      provider.name
+    )
 
     // Auto-create deal in pipeline if score is hot or warm (>60)
     if (scoring.tier === 'hot' || scoring.tier === 'warm' || scoring.score > 60) {
       // Check if open deal already exists
-      const { data: existingDeal } = await supabaseAdmin()
-        .from('deals')
-        .select('id')
-        .eq('contact_id', contactId)
-        .eq('status', 'active')
-        .limit(1)
+      const existingDeal = await dbService.business.getActiveDeal(contactId)
 
       if (!existingDeal || existingDeal.length === 0) {
         // Find default/active pipeline for user
-        const { data: pipeline } = await supabaseAdmin()
-          .from('pipelines')
-          .select('id')
-          .eq('user_id', userId)
-          .limit(1)
-          .maybeSingle()
+        const pipeline = await dbService.business.getUserPipeline(userId)
 
         if (pipeline) {
           // Find first stage in that pipeline
-          const { data: stage } = await supabaseAdmin()
-            .from('pipeline_stages')
-            .select('id, name')
-            .eq('pipeline_id', pipeline.id)
-            .order('position', { ascending: true })
-            .limit(1)
-            .maybeSingle()
+          const stage = await dbService.business.getFirstPipelineStage(pipeline.id)
 
           if (stage) {
             // Get contact name to title the deal
-            const { data: contact } = await supabaseAdmin()
-              .from('contacts')
-              .select('name')
-              .eq('id', contactId)
-              .single()
+            const contact = await dbService.business.findContactById(contactId)
 
             // Parse budget numeric value
             let dealValue = 0
@@ -408,20 +358,18 @@ async function evaluateAndCreateLead(
 
             const title = `${contact?.name || 'Lead'} - ${facts.business_type || 'Services Proposal'}`
 
-            await supabaseAdmin()
-              .from('deals')
-              .insert({
-                user_id: userId,
-                pipeline_id: pipeline.id,
-                stage_id: stage.id,
-                contact_id: contactId,
-                conversation_id: conversationId,
-                title,
-                value: dealValue,
-                currency: facts.budget && facts.budget.includes('$') ? 'USD' : 'INR',
-                notes: `AI Qualified Lead (Score: ${scoring.score}%). Reasoning: ${scoring.reasoning}. Timeline: ${facts.timeline || 'Unspecified'}. Goals: ${facts.goals || 'Unspecified'}.`,
-                status: 'active'
-              })
+            await dbService.business.createDeal({
+              user_id: userId,
+              pipeline_id: pipeline.id,
+              stage_id: stage.id,
+              contact_id: contactId,
+              conversation_id: conversationId,
+              title,
+              value: dealValue,
+              currency: facts.budget && facts.budget.includes('$') ? 'USD' : 'INR',
+              notes: `AI Qualified Lead (Score: ${scoring.score}%). Reasoning: ${scoring.reasoning}. Timeline: ${facts.timeline || 'Unspecified'}. Goals: ${facts.goals || 'Unspecified'}.`,
+              status: 'active'
+            })
             
             console.log(`[AI/engine] Automatically created active deal for contact ${contactId} in pipeline stage ${stage.name}`)
           }
@@ -467,7 +415,6 @@ export async function dispatchAIReply(
     const confidenceThreshold =
       config.confidence_threshold ?? DEFAULT_CONFIDENCE_THRESHOLD
     const handoffMessage = config.human_handoff_message || DEFAULT_HANDOFF_MESSAGE
-    const systemPromptBase = config.system_prompt || BASE_SYSTEM_PROMPT
 
     // ─────────────────────────────────────────────────────────
     // 2. Quick human-request check (no LLM cost)
@@ -482,36 +429,95 @@ export async function dispatchAIReply(
     }
 
     // ─────────────────────────────────────────────────────────
-    // 3. Get AI provider (respecting DB overrides)
+    // 3. Intent & Agent Selection
     // ─────────────────────────────────────────────────────────
-    const provider = tryGetAIProvider(config.ai_provider)
+    const intentAnalysis = await analyzeIntent(inboundText)
+    
+    // Check if user wants human handoff
+    if (intentAnalysis.wantsHuman || intentAnalysis.intent === 'human_request') {
+      return await handleHumanHandoff({
+        userId,
+        conversationId,
+        handoffMessage,
+        reason: 'explicit_human_request',
+      })
+    }
+
+    let agentId = intentAnalysis.selectedAgent || 'general'
+    let agentConfig = await dbService.ai.getAIAgent(userId, agentId)
+
+    // Fallback logic if agent is disabled in DB
+    if (agentConfig && !agentConfig.enabled) {
+      agentId = agentId === 'receptionist' ? 'general' : 'receptionist'
+      agentConfig = await dbService.ai.getAIAgent(userId, agentId)
+    }
+
+    if (!agentConfig || !agentConfig.enabled) {
+      const defaultDef = DEFAULT_AGENTS[agentId] || DEFAULT_AGENTS['general']
+      agentConfig = {
+        userId,
+        agentId,
+        enabled: true,
+        name: defaultDef.name,
+        description: defaultDef.description,
+        systemPrompt: defaultDef.systemPrompt,
+        priority: defaultDef.priority,
+        tools: defaultDef.tools,
+        updatedAt: new Date().toISOString(),
+        provider: config.ai_provider,
+        model: config.model,
+        temperature: 0.7
+      }
+    }
+
+    const activeProviderName = agentConfig.provider || config.ai_provider
+    const activeModelName = agentConfig.model || config.model
+    const activeTemperature = agentConfig.temperature ?? 0.7
+    const systemPromptBase = agentConfig.systemPrompt || BASE_SYSTEM_PROMPT
+
+    // ─────────────────────────────────────────────────────────
+    // 4. Get AI provider (respecting agent overrides)
+    // ─────────────────────────────────────────────────────────
+    const provider = tryGetAIProvider(activeProviderName)
     if (!provider) {
-      console.warn('[AI/engine] No AI provider available — skipping auto-reply')
+      console.warn(`[AI/engine] No AI provider available for ${activeProviderName} — skipping auto-reply`)
       return { replied: false, handedOff: false }
     }
 
     // ─────────────────────────────────────────────────────────
-    // 4. Fetch conversation history
+    // 5. Fetch conversation history
     // ─────────────────────────────────────────────────────────
     const history = await fetchConversationHistory(conversationId)
 
     // ─────────────────────────────────────────────────────────
-    // 5. RAG: knowledge base search
+    // 6. RAG: knowledge base search with agent-specific category filtering
     // ─────────────────────────────────────────────────────────
+    const AGENT_CATEGORY_MAP: Record<string, string> = {
+      website_consultant: 'website',
+      seo_consultant: 'seo',
+      digital_marketing: 'marketing',
+      business_registration: 'registration',
+      proposal_writer: 'proposal',
+      quotation_generator: 'pricing',
+      sales: 'pricing',
+      support: 'support',
+    }
+    const ragCategory = AGENT_CATEGORY_MAP[agentId]
+
     const knowledgeChunks = await searchKnowledge(userId, inboundText, {
       threshold: 0.65,
       topK: MAX_KNOWLEDGE_CHUNKS,
+      category: ragCategory,
     })
     const knowledgeContext = formatKnowledgeForPrompt(knowledgeChunks)
 
     // ─────────────────────────────────────────────────────────
-    // 6. Contact memory
+    // 7. Unified Contact & CRM memory
     // ─────────────────────────────────────────────────────────
-    const memory = await getContactMemory(userId, contactId)
-    const memoryContext = formatMemoryForPrompt(memory)
+    const memoryContext = await getUnifiedMemoryContext(userId, contactId)
 
     // ─────────────────────────────────────────────────────────
-    // 7. Build full system prompt
+    // 8. Build full system prompt
     // ─────────────────────────────────────────────────────────
     const systemPromptParts = [systemPromptBase]
     if (knowledgeContext) systemPromptParts.push(knowledgeContext)
@@ -519,13 +525,14 @@ export async function dispatchAIReply(
     const fullSystemPrompt = systemPromptParts.join('\n\n')
 
     // ─────────────────────────────────────────────────────────
-    // 8. Call AI provider with Latency Tracking & Prompt Logs
+    // 9. Call AI provider with Latency Tracking & Prompt Logs
     // ─────────────────────────────────────────────────────────
     const aiRequest = {
       messages: [...history, { role: 'user' as const, content: inboundText }],
       systemPrompt: fullSystemPrompt,
       maxTokens: 512,
-      temperature: 0.7,
+      temperature: activeTemperature,
+      options: activeModelName ? { model: activeModelName } : undefined
     }
 
     const startCallTime = performance.now()
@@ -545,7 +552,7 @@ export async function dispatchAIReply(
     }).catch((err) => console.warn('[AI/engine] logPrompt failed:', err))
 
     // ─────────────────────────────────────────────────────────
-    // 9. Confidence check → human handoff
+    // 10. Confidence check → human handoff
     // ─────────────────────────────────────────────────────────
     if (aiResponse.confidence < confidenceThreshold) {
       console.log(
@@ -572,7 +579,7 @@ export async function dispatchAIReply(
     }
 
     // ─────────────────────────────────────────────────────────
-    // 10. Parse action triggers from raw response content
+    // 11. Parse action triggers from raw response content
     // ─────────────────────────────────────────────────────────
     const rawContent = aiResponse.content.trim()
     let replyText = rawContent
@@ -632,36 +639,31 @@ export async function dispatchAIReply(
     }
 
     // ─────────────────────────────────────────────────────────
-    // 11. Intent analysis (parallel with delivery for speed)
-    // ─────────────────────────────────────────────────────────
-    const intentPromise = analyzeIntent(inboundText)
-
-    // ─────────────────────────────────────────────────────────
     // 12. Insert AI reply into messages table (sender_type='bot')
     // ─────────────────────────────────────────────────────────
-    const { error: insertErr } = await supabaseAdmin().from('messages').insert({
-      conversation_id: conversationId,
-      sender_type: 'bot',
-      content_type: 'text',
-      content_text: replyText,
-      status: 'sent',
-      created_at: new Date().toISOString(),
-    })
-
-    if (insertErr) {
-      console.error('[AI/engine] Failed to insert bot message:', insertErr.message)
-      return { replied: false, handedOff: false, error: insertErr.message }
+    try {
+      await dbService.business.createMessage({
+        conversation_id: conversationId,
+        sender_type: 'bot',
+        content_type: 'text',
+        content_text: replyText,
+        status: 'sent',
+        created_at: new Date().toISOString(),
+      })
+    } catch (insertErr: any) {
+      console.error('[AI/engine] Failed to insert bot message:', insertErr.message || insertErr)
+      return { replied: false, handedOff: false, error: insertErr.message || String(insertErr) }
     }
 
     // Update conversation last_message
-    await supabaseAdmin()
-      .from('conversations')
-      .update({
+    try {
+      await dbService.business.updateConversation(conversationId, {
         last_message_text: replyText,
         last_message_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       })
-      .eq('id', conversationId)
+    } catch (updErr) {
+      console.error('[AI/engine] Failed to update conversation last message:', updErr)
+    }
 
     // ─────────────────────────────────────────────────────────
     // 13. Send via WhatsApp
@@ -680,7 +682,6 @@ export async function dispatchAIReply(
     // ─────────────────────────────────────────────────────────
     // 14. Post-reply async operations (fire-and-forget background tasks)
     // ─────────────────────────────────────────────────────────
-    const intentAnalysis = await intentPromise.catch(() => null)
 
     // Log usage to MongoDB
     void logUsage({
@@ -750,48 +751,38 @@ export async function dispatchAIReply(
 // Helpers
 // ============================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function loadAIConfig(userId: string): Promise<any | null> {
-  const { data, error } = await supabaseAdmin()
-    .from('ai_router_config')
-    .select(
-      'enabled, auto_reply, system_prompt, ai_provider, model, confidence_threshold, human_handoff_message'
-    )
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (error) {
-    console.error('[AI/engine] loadAIConfig failed:', error.message)
+  try {
+    return await dbService.business.getAIRouterConfig(userId)
+  } catch (error: any) {
+    console.error('[AI/engine] loadAIConfig failed:', error.message || error)
     return null
   }
-  return data
 }
 
 async function fetchConversationHistory(
   conversationId: string
 ): Promise<AIMessage[]> {
-  const { data, error } = await supabaseAdmin()
-    .from('messages')
-    .select('sender_type, content_text')
-    .eq('conversation_id', conversationId)
-    .not('content_text', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(MAX_HISTORY_MESSAGES)
+  try {
+    const data = await dbService.business.getRecentMessages(conversationId, MAX_HISTORY_MESSAGES)
+    if (!data || data.length === 0) return []
 
-  if (error || !data) return []
-
-  // Reverse to chronological order, then map to AI message format
-  return data
-    .reverse()
-    .map(
-      (m: { sender_type: string; content_text: string }): AIMessage => ({
-        role:
-          m.sender_type === 'customer'
-            ? 'user'
-            : 'assistant',
-        content: m.content_text,
-      })
-    )
+    // Reverse to chronological order, then map to AI message format
+    return [...data]
+      .reverse()
+      .map(
+        (m: { sender_type: string; content_text: string | null }): AIMessage => ({
+          role:
+            m.sender_type === 'customer'
+              ? 'user'
+              : 'assistant',
+          content: m.content_text || '',
+        })
+      )
+  } catch (error) {
+    console.error('[AI/engine] fetchConversationHistory failed:', error)
+    return []
+  }
 }
 
 async function handleHumanHandoff(args: {
@@ -804,7 +795,7 @@ async function handleHumanHandoff(args: {
 
   try {
     // Insert handoff message as a bot message
-    await supabaseAdmin().from('messages').insert({
+    await dbService.business.createMessage({
       conversation_id: conversationId,
       sender_type: 'bot',
       content_type: 'text',
@@ -828,24 +819,13 @@ async function handleHumanHandoff(args: {
       }
     }
 
-    // Mark ai_conversations as handed off in MongoDB Atlas
+    // Mark ai_conversations as handed off in MongoDB Atlas via dbService
     try {
-      const { db } = await connectToDatabase()
-      await db.collection('ai_conversations').updateOne(
-        { conversation_id: conversationId },
-        {
-          $set: {
-            user_id: userId,
-            ai_active: false,
-            handed_off_at: new Date(),
-            updated_at: new Date(),
-          },
-          $setOnInsert: {
-            created_at: new Date(),
-          }
-        },
-        { upsert: true }
-      )
+      await dbService.ai.upsertAIConversation(conversationId, {
+        userId,
+        aiActive: false,
+        handedOffAt: new Date(),
+      })
     } catch (dbErr) {
       console.warn('[AI/engine] Failed to set ai_conversations handoff status in MongoDB:', dbErr)
     }
@@ -861,12 +841,13 @@ async function handleHumanHandoff(args: {
 async function getConversationContact(
   conversationId: string
 ): Promise<{ contactId: string } | null> {
-  const { data } = await supabaseAdmin()
-    .from('conversations')
-    .select('contact_id')
-    .eq('id', conversationId)
-    .single()
-  return data ? { contactId: data.contact_id } : null
+  try {
+    const data = await dbService.business.findConversationById(conversationId)
+    return data ? { contactId: data.contact_id } : null
+  } catch (error) {
+    console.error('[AI/engine] getConversationContact failed:', error)
+    return null
+  }
 }
 
 async function upsertAIConversation(
@@ -875,28 +856,14 @@ async function upsertAIConversation(
   providerName: string
 ): Promise<void> {
   try {
-    const { db } = await connectToDatabase()
+    const existing = await dbService.ai.getAIConversation(conversationId)
     
-    const existing = await db.collection('ai_conversations').findOne({
-      conversation_id: conversationId
+    await dbService.ai.upsertAIConversation(conversationId, {
+      userId,
+      totalAiMessages: (existing?.total_ai_messages || 0) + 1,
+      aiActive: true,
+      provider: providerName,
     })
-
-    await db.collection('ai_conversations').updateOne(
-      { conversation_id: conversationId },
-      {
-        $set: {
-          user_id: userId,
-          total_ai_messages: (existing?.total_ai_messages || 0) + 1,
-          ai_active: true,
-          provider: providerName,
-          updated_at: new Date(),
-        },
-        $setOnInsert: {
-          created_at: new Date()
-        }
-      },
-      { upsert: true }
-    )
   } catch (err) {
     console.warn('[AI/engine] upsertAIConversation failed:', err)
   }
@@ -916,18 +883,14 @@ interface UsageLogArgs {
 
 async function logUsage(args: UsageLogArgs): Promise<void> {
   try {
-    const { db } = await connectToDatabase()
-    await db.collection('ai_usage_logs').insertOne({
-      user_id: args.userId,
-      conversation_id: args.conversationId,
-      contact_id: args.contactId,
+    await dbService.ai.logAIUsage({
+      userId: args.userId,
       operation: args.operation,
       provider: args.provider,
       model: args.model,
-      total_tokens: args.totalTokens,
-      confidence: args.confidence ?? null,
-      finish_reason: args.finishReason ?? null,
-      created_at: new Date(),
+      totalTokens: args.totalTokens,
+      confidence: args.confidence,
+      finishReason: args.finishReason,
     })
   } catch (err) {
     console.warn('[AI/engine] logUsage failed (non-fatal):', err)

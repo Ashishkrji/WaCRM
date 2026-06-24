@@ -68,6 +68,9 @@ export function PipelineAnalytics({ stages, deals }: PipelineAnalyticsProps) {
 
     const stageById = new Map(sortedStages.map((s) => [s.id, s]));
     const weightedValue = openDeals.reduce((sum, d) => {
+      if (d.expected_revenue !== undefined && d.expected_revenue !== null) {
+        return sum + Number(d.expected_revenue);
+      }
       const stage = stageById.get(d.stage_id);
       if (!stage) return sum;
       const prob = computeStageProbability(stage, sortedStages);

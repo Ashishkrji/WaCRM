@@ -67,7 +67,7 @@ export class ClaudeProvider implements AIProvider {
   async chat(request: AIRequest): Promise<AIResponse> {
     const system = this.systemPrompt(request)
     const body: Record<string, unknown> = {
-      model: this.model,
+      model: (request.options?.model as string) || this.model,
       messages: this.buildMessages(request),
       max_tokens: request.maxTokens ?? 1024,
       temperature: request.temperature ?? 0.7,
@@ -113,7 +113,7 @@ export class ClaudeProvider implements AIProvider {
   async *stream(request: AIRequest): AsyncGenerator<string, void, unknown> {
     const system = this.systemPrompt(request)
     const body: Record<string, unknown> = {
-      model: this.model,
+      model: (request.options?.model as string) || this.model,
       messages: this.buildMessages(request),
       max_tokens: request.maxTokens ?? 1024,
       temperature: request.temperature ?? 0.7,

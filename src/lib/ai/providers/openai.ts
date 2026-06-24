@@ -114,7 +114,7 @@ export class OpenAICompatibleProvider implements AIProvider {
         ...this.extraHeaders,
       },
       body: JSON.stringify({
-        model: this.model,
+        model: (request.options?.model as string) || this.model,
         messages: this.buildMessages(request),
         max_tokens: request.maxTokens ?? 1024,
         temperature: request.temperature ?? 0.7,
@@ -151,7 +151,7 @@ export class OpenAICompatibleProvider implements AIProvider {
         ...this.extraHeaders,
       },
       body: JSON.stringify({
-        model: this.model,
+        model: (request.options?.model as string) || this.model,
         messages: this.buildMessages(request),
         max_tokens: request.maxTokens ?? 1024,
         temperature: request.temperature ?? 0.7,

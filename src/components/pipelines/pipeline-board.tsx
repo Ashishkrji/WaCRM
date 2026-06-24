@@ -113,12 +113,17 @@ export function PipelineBoard({
             (s, d) => s + Number(d.value || 0),
             0,
           );
+          const weightedValue = stageDeals.reduce(
+            (s, d) => s + Number(d.value || 0) * (Number(d.probability ?? 50) / 100),
+            0,
+          );
           return (
             <StageColumn
               key={stage.id}
               stage={stage}
               deals={stageDeals}
               totalValue={totalValue}
+              weightedValue={weightedValue}
               onAddDeal={onAddDeal}
               onEditDeal={onEditDeal}
             />
@@ -168,12 +173,14 @@ function StageColumn({
   stage,
   deals,
   totalValue,
+  weightedValue,
   onAddDeal,
   onEditDeal,
 }: {
   stage: PipelineStage;
   deals: Deal[];
   totalValue: number;
+  weightedValue: number;
   onAddDeal: (stageId: string) => void;
   onEditDeal: (deal: Deal) => void;
 }) {
@@ -200,7 +207,12 @@ function StageColumn({
           {deals.length}
         </span>
       </div>
-      <p className="text-xs text-slate-400">{formatCurrency(totalValue)}</p>
+      <div className="flex justify-between items-center text-xs mt-0.5 font-semibold">
+        <span className="text-slate-350">{formatCurrency(totalValue)}</span>
+        <span className="text-[10.5px] text-emerald-400 font-bold" title="Weighted Expected Revenue (Value * Probability)">
+          Exp: {formatCurrency(weightedValue)}
+        </span>
+      </div>
 
       <div
         ref={setNodeRef}

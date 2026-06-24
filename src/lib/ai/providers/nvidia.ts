@@ -99,7 +99,7 @@ export class NvidiaProvider implements AIProvider {
   async chat(request: AIRequest): Promise<AIResponse> {
     const url = `${this.baseUrl}/chat/completions`
     const body = {
-      model: this.model,
+      model: (request.options?.model as string) || this.model,
       messages: this.buildMessages(request),
       max_tokens: request.maxTokens ?? 1024,
       temperature: request.temperature ?? 0.7,
@@ -145,7 +145,7 @@ export class NvidiaProvider implements AIProvider {
   async *stream(request: AIRequest): AsyncGenerator<string, void, unknown> {
     const url = `${this.baseUrl}/chat/completions`
     const body = {
-      model: this.model,
+      model: (request.options?.model as string) || this.model,
       messages: this.buildMessages(request),
       max_tokens: request.maxTokens ?? 1024,
       temperature: request.temperature ?? 0.7,

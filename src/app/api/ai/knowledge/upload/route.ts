@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { type SupabaseClient } from '@supabase/supabase-js'
 import { ingestText } from '@/lib/ai/knowledge/ingest'
-import { connectToDatabase } from '@/lib/mongodb'
+import { dbService } from '@/services/db'
 import crypto from 'crypto'
 
 async function requireUser(): Promise<
@@ -70,6 +70,16 @@ export async function POST(request: Request) {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const docType = formData.get('doc_type') as string | null // 'pdf' | 'docx' | 'txt' etc.
+    const category = formData.get('category') as string | null || 'General'
+    const tagsRaw = formData.get('tags') as string | null
+    let tags: string[] = []
+    if (tagsRaw) {
+      try {
+        tags = JSON.parse(tagsRaw)
+      } catch {
+        tags = tagsRaw.split(',').map((t) => t.trim()).filter(Boolean)
+      }
+    }
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -81,7 +91,7 @@ export async function POST(request: Request) {
     const fileExtension = fileName.split('.').pop()?.toLowerCase()
     
     const detectedDocType = docType || (fileExtension === 'pdf' ? 'pdf' : fileExtension === 'docx' ? 'docx' : 'txt')
-
+ 
     // 1. Upload to Supabase Storage bucket 'knowledge-base'
     const storagePath = `${userId}/${Date.now()}_${fileName}`
     const { data: uploadData, error: uploadErr } = await supabase.storage
@@ -108,7 +118,7 @@ export async function POST(request: Request) {
       extractedText = buffer.toString('utf-8')
     }
 
-    // 3. Create entry in knowledge_base (MongoDB)
+    // 3. Create entry in knowledge_base (MongoDB) via dbService
     const finalDocType = ['pdf', 'docx', 'txt'].includes(detectedDocType) ? detectedDocType : 'txt'
     const docId = crypto.randomUUID()
     const doc = {
@@ -118,20 +128,23 @@ export async function POST(request: Request) {
       doc_type: finalDocType,
       content: extractedText,
       storage_path: storagePath,
+      category,
+      tags,
       status: 'pending',
       chunk_count: 0,
       created_at: new Date(),
       updated_at: new Date(),
     }
 
-    const { db } = await connectToDatabase()
-    await db.collection('knowledge_base').insertOne(doc)
+    await dbService.ai.insertKnowledgeDoc(doc)
 
     // 4. Trigger ingestion in the background
     void ingestText({
       userId,
       knowledgeBaseId: docId,
       content: extractedText,
+      category,
+      tags,
     }).catch((err) => {
       console.error('[knowledge/ingest] Background ingest failed:', err)
     })

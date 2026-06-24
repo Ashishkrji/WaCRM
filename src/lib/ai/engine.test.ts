@@ -49,24 +49,36 @@ const mockSupabaseClient = {
   }),
 };
 
-vi.mock("@supabase/supabase-js", () => {
+vi.mock("@/services/db", () => {
   return {
-    createClient: vi.fn(() => mockSupabaseClient),
-  };
-});
-
-vi.mock("@/lib/mongodb", () => {
-  return {
-    connectToDatabase: vi.fn().mockResolvedValue({
-      client: {},
-      db: {
-        collection: vi.fn().mockReturnValue({
-          insertOne: vi.fn().mockResolvedValue({}),
-          updateOne: vi.fn().mockResolvedValue({}),
-          findOne: vi.fn().mockResolvedValue(null),
+    dbService: {
+      business: {
+        getAIRouterConfig: vi.fn().mockResolvedValue({
+          enabled: true,
+          auto_reply: true,
+          ai_provider: "gemini",
+          confidence_threshold: 0.5,
+          system_prompt: "Sales Rep prompt",
         }),
+        getRecentMessages: vi.fn().mockResolvedValue([]),
+        createMessage: vi.fn().mockResolvedValue({}),
+        updateConversation: vi.fn().mockResolvedValue({}),
+        findConversationById: vi.fn().mockResolvedValue({ contact_id: "contact-456" }),
+        createMeetingBooking: vi.fn().mockResolvedValue("mock-new-id-999"),
+        createQuotationRequest: vi.fn().mockResolvedValue("mock-new-id-999"),
+        createProposalRequest: vi.fn().mockResolvedValue("mock-new-id-999"),
+        countTotalMessages: vi.fn().mockResolvedValue(10),
+        countCustomerMessages: vi.fn().mockResolvedValue(5),
+        updateContact: vi.fn().mockResolvedValue({}),
+        upsertLeadScore: vi.fn().mockResolvedValue({}),
       },
-    }),
+      ai: {
+        getAIConversation: vi.fn().mockResolvedValue(null),
+        upsertAIConversation: vi.fn().mockResolvedValue({}),
+        logAIUsage: vi.fn().mockResolvedValue({}),
+        getAIAgent: vi.fn().mockResolvedValue(null),
+      },
+    },
   };
 });
 
@@ -97,6 +109,7 @@ vi.mock("./memory", () => {
     getContactMemory: vi.fn().mockResolvedValue(null),
     formatMemoryForPrompt: vi.fn().mockReturnValue(""),
     updateContactMemory: vi.fn().mockResolvedValue(null),
+    getUnifiedMemoryContext: vi.fn().mockResolvedValue(""),
   };
 });
 

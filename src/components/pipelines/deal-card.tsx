@@ -1,7 +1,8 @@
 "use client";
 
 import type { Deal, PipelineStage } from "@/types";
-import { Calendar, Check, X } from "lucide-react";
+import { Calendar, Check, X, User, MessageSquare } from "lucide-react";
+import Link from "next/link";
 
 interface DealCardProps {
   deal: Deal;
@@ -64,18 +65,31 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
         <h4 className="flex-1 text-sm font-semibold leading-snug text-white break-words">
           {deal.title}
         </h4>
-        {deal.status === "won" && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
-            <Check className="h-3 w-3" />
-            Won
-          </span>
-        )}
-        {deal.status === "lost" && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-400">
-            <X className="h-3 w-3" />
-            Lost
-          </span>
-        )}
+        <div className="flex shrink-0 flex-col gap-1 items-end">
+          {deal.status === "won" && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+              <Check className="h-3 w-3" />
+              Won
+            </span>
+          )}
+          {deal.status === "lost" && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-400">
+              <X className="h-3 w-3" />
+              Lost
+            </span>
+          )}
+          {deal.priority && (
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+              deal.priority === "high"
+                ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                : deal.priority === "medium"
+                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+            }`}>
+              {deal.priority.toUpperCase()}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Contact row */}
@@ -86,10 +100,26 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
         <span className="truncate text-xs text-slate-400">{contactLabel}</span>
       </div>
 
+      {/* Services tags */}
+      {deal.services && deal.services.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {deal.services.map((svc) => (
+            <span key={svc} className="inline-flex items-center rounded bg-slate-700/50 px-1.5 py-0.5 text-[9px] font-medium text-slate-300">
+              {svc}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="mt-2 flex items-center justify-between">
-        <span className="text-sm font-bold text-primary">
-          {formatCurrency(deal.value, deal.currency)}
-        </span>
+        <div className="flex flex-col">
+          <span className="text-sm font-bold text-primary">
+            {formatCurrency(deal.value, deal.currency)}
+          </span>
+          <span className="text-[10px] text-slate-500 font-medium">
+            Expected: {formatCurrency(Number(deal.value || 0) * (Number(deal.probability ?? 50) / 100), deal.currency)} ({deal.probability ?? 50}%)
+          </span>
+        </div>
         {deal.expected_close_date && (
           <span className="flex items-center gap-1 text-[11px] text-slate-500">
             <Calendar className="h-3 w-3" />
@@ -97,6 +127,24 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
           </span>
         )}
       </div>
+
+      {/* Hover-triggered quick actions */}
+      {!isOverlay && deal.contact_id && (
+        <div className="mt-2.5 pt-2 border-t border-slate-750/60 flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <Link href={`/contacts/${deal.contact_id}`} onClick={(e) => e.stopPropagation()} className="shrink-0">
+            <span className="inline-flex items-center gap-1 rounded bg-slate-700/55 hover:bg-slate-700 hover:text-white px-2 py-0.5 text-[9px] font-bold text-slate-300 transition-colors">
+              <User className="h-2.5 w-2.5 text-primary" />
+              Profile
+            </span>
+          </Link>
+          <Link href={`/inbox?contact=${deal.contact_id}`} onClick={(e) => e.stopPropagation()} className="shrink-0">
+            <span className="inline-flex items-center gap-1 rounded bg-slate-700/55 hover:bg-slate-700 hover:text-white px-2 py-0.5 text-[9px] font-bold text-slate-300 transition-colors">
+              <MessageSquare className="h-2.5 w-2.5 text-sky-400" />
+              Chat
+            </span>
+          </Link>
+        </div>
+      )}
 
       {assigneeLabel && (
         <div className="mt-2 flex items-center justify-end">

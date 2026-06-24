@@ -6,21 +6,8 @@
  * from the AI engine when a conversation exceeds the trigger threshold.
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { dbService } from '@/services/db'
 import { tryGetAIProvider } from './provider-factory'
-import { connectToDatabase } from '@/lib/mongodb'
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _admin: any = null
-function supabaseAdmin() {
-  if (!_admin) {
-    _admin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _admin
-}
 
 const SUMMARY_MAX_TOKENS = 300
 const SUMMARY_TEMPERATURE = 0.3
@@ -48,35 +35,24 @@ export async function maybeGenerateSummary(
   userId: string,
   conversationId: string
 ): Promise<void> {
-  const db = supabaseAdmin()
-
-  // Count messages in this conversation
-  const { count } = await db
-    .from('messages')
-    .select('id', { count: 'exact', head: true })
-    .eq('conversation_id', conversationId)
-
-  if ((count ?? 0) < SUMMARY_TRIGGER_COUNT) return
-
   try {
-    const { db: mongoDb } = await connectToDatabase()
+    // Count messages in this conversation via Business Service (Supabase)
+    const count = await dbService.business.countTotalMessages(conversationId)
 
-    // Check if we already have a summary in MongoDB
-    const existingSummary = await mongoDb.collection('conversation_summaries')
-      .findOne(
-        { conversation_id: conversationId },
-        { sort: { created_at: -1 } }
-      )
+    if (count < SUMMARY_TRIGGER_COUNT) return
+
+    // Check if we already have a summary in MongoDB via AI Service
+    const existingSummary = await dbService.ai.getSummary(conversationId)
 
     // Skip if the existing summary is less than 20 messages old
     if (
       existingSummary &&
-      (count ?? 0) - (existingSummary.message_count_at_summary || 0) < 20
+      count - (existingSummary.message_count_at_summary || 0) < 20
     ) {
       return
     }
 
-    await generateConversationSummary(userId, conversationId, count ?? 0)
+    await generateConversationSummary(userId, conversationId, count)
   } catch (err) {
     console.error('[AI/summary] maybeGenerateSummary failed:', err)
   }
@@ -93,34 +69,26 @@ export async function generateConversationSummary(
   const provider = tryGetAIProvider()
   if (!provider) return null
 
-  const db = supabaseAdmin()
-
-  // Fetch recent messages
-  const { data: messages, error: msgErr } = await db
-    .from('messages')
-    .select('sender_type, content_text, created_at')
-    .eq('conversation_id', conversationId)
-    .not('content_text', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(MAX_MESSAGES_FOR_SUMMARY)
-
-  if (msgErr || !messages || messages.length === 0) return null
-
-  // Build the conversation transcript (oldest first)
-  const transcript = messages
-    .reverse()
-    .map((m: { sender_type: string; content_text: string }) => {
-      const role =
-        m.sender_type === 'customer'
-          ? 'Customer'
-          : m.sender_type === 'bot'
-            ? 'AI Agent'
-            : 'Agent'
-      return `${role}: ${m.content_text}`
-    })
-    .join('\n')
-
   try {
+    // Fetch recent messages via Business Service (Supabase)
+    const messages = await dbService.business.getRecentMessages(conversationId, MAX_MESSAGES_FOR_SUMMARY)
+
+    if (!messages || messages.length === 0) return null
+
+    // Build the conversation transcript (oldest first)
+    const transcript = [...messages]
+      .reverse()
+      .map((m: { sender_type: string; content_text: string | null }) => {
+        const role =
+          m.sender_type === 'customer'
+            ? 'Customer'
+            : m.sender_type === 'bot'
+              ? 'AI Agent'
+              : 'Agent'
+        return `${role}: ${m.content_text || ''}`
+      })
+      .join('\n')
+
     const response = await provider.chat({
       messages: [{ role: 'user', content: transcript }],
       systemPrompt: SUMMARY_SYSTEM_PROMPT,
@@ -131,27 +99,15 @@ export async function generateConversationSummary(
     const summary = response.content.trim()
     if (!summary) return null
 
-    const { db: mongoDb } = await connectToDatabase()
-
-    // Upsert the summary in MongoDB
-    await mongoDb.collection('conversation_summaries').updateOne(
-      { conversation_id: conversationId },
-      {
-        $set: {
-          user_id: userId,
-          summary,
-          message_count_at_summary: messageCount,
-          provider: provider.name,
-          model: process.env.NVIDIA_MODEL || process.env.OPENAI_MODEL || 'default',
-          tokens_used: response.tokensUsed,
-          updated_at: new Date(),
-        },
-        $setOnInsert: {
-          created_at: new Date(),
-        }
-      },
-      { upsert: true }
-    )
+    // Upsert the summary in MongoDB via AI Service
+    await dbService.ai.upsertSummary(conversationId, {
+      userId,
+      summary,
+      messageCountAtSummary: messageCount,
+      provider: provider.name,
+      model: process.env.NVIDIA_MODEL || process.env.OPENAI_MODEL || 'default',
+      tokensUsed: response.tokensUsed,
+    })
 
     return summary
   } catch (err) {

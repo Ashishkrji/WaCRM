@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbService } from '@/services/db'
 import { createClient } from '@supabase/supabase-js'
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption'
 import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api'
@@ -533,50 +534,35 @@ async function processMessage(
       ? 'image'   // stickers are images
       : 'text'    // reaction, unknown → text fallback
 
-  // Determine whether this is the contact's very first inbound message
-  // BEFORE we insert, so the count is accurate. Covers the case where
-  // the contact row already exists (manual add / CSV import) but they've
-  // never messaged us before — which new_contact_created wouldn't catch.
-  const { count: priorCustomerMsgCount } = await supabaseAdmin()
-    .from('messages')
-    .select('id', { count: 'exact', head: true })
-    .eq('conversation_id', conversation.id)
-    .eq('sender_type', 'customer')
-  const isFirstInboundMessage = (priorCustomerMsgCount ?? 0) === 0
+  const priorCustomerMsgCount = await dbService.business.countCustomerMessages(conversation.id)
+  const isFirstInboundMessage = priorCustomerMsgCount === 0
 
-  const { error: msgError } = await supabaseAdmin().from('messages').insert({
-    conversation_id: conversation.id,
-    sender_type: 'customer',
-    content_type: contentType,
-    content_text: contentText,
-    media_url: mediaUrl,
-    message_id: message.id,
-    status: 'delivered',
-    created_at: new Date(parseInt(message.timestamp) * 1000).toISOString(),
-    reply_to_message_id: replyToInternalId,
-    // Only populated for content_type='interactive'. Migration 010 added
-    // the column; null for every other content_type so existing inserts
-    // behave identically.
-    interactive_reply_id: interactiveReplyId,
-  })
-
-  if (msgError) {
+  try {
+    await dbService.business.createMessage({
+      conversation_id: conversation.id,
+      sender_type: 'customer',
+      content_type: contentType,
+      content_text: contentText,
+      media_url: mediaUrl,
+      message_id: message.id,
+      status: 'delivered',
+      created_at: new Date(parseInt(message.timestamp) * 1000).toISOString(),
+      reply_to_message_id: replyToInternalId,
+      interactive_reply_id: interactiveReplyId,
+    })
+  } catch (msgError) {
     console.error('Error inserting message:', msgError)
     return
   }
 
   // Update conversation
-  const { error: convError } = await supabaseAdmin()
-    .from('conversations')
-    .update({
+  try {
+    await dbService.business.updateConversation(conversation.id, {
       last_message_text: contentText || `[${message.type}]`,
       last_message_at: new Date().toISOString(),
       unread_count: (conversation.unread_count || 0) + 1,
-      updated_at: new Date().toISOString(),
     })
-    .eq('id', conversation.id)
-
-  if (convError) {
+  } catch (convError) {
     console.error('Error updating conversation:', convError)
   }
 
@@ -838,77 +824,27 @@ async function findOrCreateContact(
   phone: string,
   name: string
 ): Promise<ContactOutcome | null> {
-  // Look up existing contacts for this user
-  const { data: contacts, error: contactsError } = await supabaseAdmin()
-    .from('contacts')
-    .select('*')
-    .eq('user_id', userId)
-
-  if (contactsError) {
-    console.error('Error fetching contacts:', contactsError)
-    return null
-  }
-
-  // Use phonesMatch for flexible matching
-  const existingContact = contacts?.find((c: ContactRow) => phonesMatch(c.phone, phone))
-
-  if (existingContact) {
-    // Update name if it changed
-    if (name && name !== existingContact.name) {
-      await supabaseAdmin()
-        .from('contacts')
-        .update({ name, updated_at: new Date().toISOString() })
-        .eq('id', existingContact.id)
+  try {
+    const outcome = await dbService.sync.syncLead(userId, { phone, name })
+    return {
+      contact: outcome.contact,
+      wasCreated: outcome.wasCreated,
     }
-    return { contact: existingContact, wasCreated: false }
-  }
-
-  // Create new contact
-  const { data: newContact, error: createError } = await supabaseAdmin()
-    .from('contacts')
-    .insert({
-      user_id: userId,
-      phone,
-      name: name || phone,
-    })
-    .select()
-    .single()
-
-  if (createError) {
-    console.error('Error creating contact:', createError)
+  } catch (err) {
+    console.error('Error syncing contact:', err)
     return null
   }
-
-  return { contact: newContact, wasCreated: true }
 }
 
 async function findOrCreateConversation(userId: string, contactId: string) {
-  // Look for existing conversation
-  const { data: existing, error: findError } = await supabaseAdmin()
-    .from('conversations')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('contact_id', contactId)
-    .single()
-
-  if (!findError && existing) {
-    return existing
-  }
-
-  // Create new conversation
-  const { data: newConv, error: createError } = await supabaseAdmin()
-    .from('conversations')
-    .insert({
-      user_id: userId,
-      contact_id: contactId,
-    })
-    .select()
-    .single()
-
-  if (createError) {
-    console.error('Error creating conversation:', createError)
+  try {
+    const existing = await dbService.business.findConversationByContact(userId, contactId)
+    if (existing) {
+      return existing
+    }
+    return await dbService.business.createConversation(userId, contactId)
+  } catch (err) {
+    console.error('Error finding/creating conversation:', err)
     return null
   }
-
-  return newConv
 }

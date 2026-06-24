@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { connectToDatabase } from '@/lib/mongodb'
+import { dbService } from '@/services/db'
 import { type SupabaseClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
@@ -25,11 +25,8 @@ export async function GET() {
   }
 
   try {
-    const { db } = await connectToDatabase()
-    const templates = await db.collection('prompt_templates')
-      .find({ user_id: guard.userId })
-      .sort({ created_at: -1 })
-      .toArray()
+    // Fetch templates from MongoDB Atlas using the Database Service Layer
+    const templates = await dbService.ai.listPromptTemplates(guard.userId)
 
     const formatted = templates.map(t => ({
       id: t.id || t._id.toString(),
@@ -58,39 +55,24 @@ export async function POST(request: Request) {
     const { name, description, content, is_default, intent_filter, id } = body
 
     if (!name || !content) {
-      return NextResponse.json({ error: 'Missing name or content' }, { status: 400 })
+       return NextResponse.json({ error: 'Missing name or content' }, { status: 400 })
     }
 
-    const { db } = await connectToDatabase()
     const templateId = id || crypto.randomUUID()
 
-    // If setting as default, unset other defaults for this user
+    // If setting as default, unset other defaults for this user via dbService
     if (is_default) {
-      await db.collection('prompt_templates').updateMany(
-        { user_id: guard.userId },
-        { $set: { is_default: false, updated_at: new Date() } }
-      )
+      await dbService.ai.unsetDefaultPromptTemplates(guard.userId)
     }
 
-    await db.collection('prompt_templates').updateOne(
-      { id: templateId, user_id: guard.userId },
-      {
-        $set: {
-          name,
-          description: description || null,
-          content,
-          is_default: !!is_default,
-          intent_filter: intent_filter || [],
-          updated_at: new Date(),
-        },
-        $setOnInsert: {
-          id: templateId,
-          user_id: guard.userId,
-          created_at: new Date(),
-        }
-      },
-      { upsert: true }
-    )
+    // Upsert prompt template via dbService
+    await dbService.ai.upsertPromptTemplate(guard.userId, templateId, {
+      name,
+      description,
+      content,
+      is_default: !!is_default,
+      intent_filter,
+    })
 
     return NextResponse.json({ success: true, id: templateId })
   } catch (err: any) {
@@ -112,11 +94,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Missing id parameter' }, { status: 400 })
     }
 
-    const { db } = await connectToDatabase()
-    await db.collection('prompt_templates').deleteOne({
-      id: id,
-      user_id: guard.userId
-    })
+    // Delete prompt template via dbService
+    await dbService.ai.deletePromptTemplate(guard.userId, id)
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

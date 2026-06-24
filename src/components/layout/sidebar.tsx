@@ -31,6 +31,7 @@ import {
   Webhook,
   Tag,
   Settings2,
+  CheckSquare,
 } from "lucide-react";
 import {
   Avatar,
@@ -59,6 +60,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/inbox", label: "Inbox", icon: MessageSquare },
+  { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/pipelines", label: "Pipelines", icon: GitBranch },
   { href: "/pipeline-manager", label: "Pipeline Manager", icon: Settings2 },

@@ -69,7 +69,7 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
     throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
   }
 
-  const dbName = process.env.MONGODB_DB_NAME || 'wacrm';
+  const dbName = process.env.MONGODB_DATABASE || process.env.MONGODB_DB_NAME || 'wacrm';
 
   const client = new MongoClient(uri, {
     maxPoolSize: 10,

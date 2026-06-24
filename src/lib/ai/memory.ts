@@ -6,7 +6,7 @@
  * This provides continuity across multiple conversations.
  */
 
-import { connectToDatabase } from '@/lib/mongodb'
+import { dbService } from '@/services/db'
 import type { ContactMemory } from './types'
 
 /**
@@ -18,24 +18,7 @@ export async function getContactMemory(
   contactId: string
 ): Promise<ContactMemory | null> {
   try {
-    const { db } = await connectToDatabase()
-    const data = await db.collection('ai_memory').findOne({
-      user_id: userId,
-      contact_id: contactId,
-    })
-
-    if (!data) return null
-
-    return {
-      userId: data.user_id,
-      contactId: data.contact_id,
-      facts: (data.facts as Record<string, string>) || {},
-      lastIntent: data.last_intent,
-      lastLanguage: data.last_language,
-      lastSentiment: data.last_sentiment,
-      totalInteractions: data.total_interactions || 0,
-      updatedAt: data.updated_at ? new Date(data.updated_at).toISOString() : new Date().toISOString(),
-    }
+    return await dbService.ai.getContactMemory(userId, contactId)
   } catch (err) {
     console.error('[AI/memory] getContactMemory failed:', err)
     return null
@@ -53,40 +36,7 @@ export async function updateContactMemory(
   updates: Partial<Omit<ContactMemory, 'userId' | 'contactId' | 'updatedAt'>>
 ): Promise<void> {
   try {
-    const { db } = await connectToDatabase()
-
-    // Fetch existing record to merge facts
-    const existing = await db.collection('ai_memory').findOne({
-      user_id: userId,
-      contact_id: contactId,
-    })
-
-    const mergedFacts = {
-      ...(existing?.facts || {}),
-      ...(updates.facts || {}),
-    }
-
-    await db.collection('ai_memory').updateOne(
-      {
-        user_id: userId,
-        contact_id: contactId,
-      },
-      {
-        $set: {
-          facts: mergedFacts,
-          last_intent: updates.lastIntent ?? existing?.last_intent ?? null,
-          last_language: updates.lastLanguage ?? existing?.last_language ?? 'en',
-          last_sentiment: updates.lastSentiment ?? existing?.last_sentiment ?? 'neutral',
-          total_interactions:
-            (existing?.total_interactions || 0) + (updates.totalInteractions || 0),
-          updated_at: new Date(),
-        },
-        $setOnInsert: {
-          created_at: new Date(),
-        }
-      },
-      { upsert: true }
-    )
+    await dbService.ai.updateContactMemory(userId, contactId, updates)
   } catch (err) {
     console.error('[AI/memory] updateContactMemory failed:', err)
   }
@@ -119,4 +69,90 @@ export function formatMemoryForPrompt(memory: ContactMemory | null): string {
 
   if (parts.length === 0) return ''
   return `--- CUSTOMER CONTEXT ---\n${parts.join('\n')}\n--- END CONTEXT ---`
+}
+
+/**
+ * Compile and format a unified context containing:
+ *   1. Long-term memory: facts extracted from MongoDB
+ *   2. Medium-term memory: recent CRM objects (deals, quotes, proposals, bookings) from PostgreSQL
+ *   3. Short-term memory context: last intent, last language, last sentiment
+ */
+export async function getUnifiedMemoryContext(
+  userId: string,
+  contactId: string
+): Promise<string> {
+  const parts: string[] = []
+
+  try {
+    // 1. Fetch Long-term Memory from MongoDB Atlas
+    const longTermMemory = await getContactMemory(userId, contactId)
+    
+    // 2. Fetch Medium-term Memory from Supabase PostgreSQL (via dbService)
+    const [deals, bookings, quotes, proposals] = await Promise.all([
+      dbService.business.getRecentDeals(contactId, 3).catch(() => []),
+      dbService.business.getRecentMeetingBookings(contactId, 3).catch(() => []),
+      dbService.business.getRecentQuotationRequests(contactId, 3).catch(() => []),
+      dbService.business.getRecentProposalRequests(contactId, 3).catch(() => []),
+    ])
+
+    // Format Long-term memory
+    if (longTermMemory) {
+      const facts = Object.entries(longTermMemory.facts)
+      if (facts.length > 0) {
+        const factLines = facts
+          .map(([k, v]) => `- ${k}: ${v}`)
+          .join('\n')
+        parts.push(`### LONG-TERM CUSTOMER FACTS & PREFERENCES:\n${factLines}`)
+      }
+      
+      // Short-term summary states
+      const stParts: string[] = []
+      if (longTermMemory.lastLanguage) stParts.push(`Preferred Language: ${longTermMemory.lastLanguage}`)
+      if (longTermMemory.lastIntent) stParts.push(`Last Message Intent: ${longTermMemory.lastIntent}`)
+      if (longTermMemory.lastSentiment) stParts.push(`Last Message Sentiment: ${longTermMemory.lastSentiment}`)
+      if (longTermMemory.totalInteractions > 0) stParts.push(`Total AI Interactions: ${longTermMemory.totalInteractions}`)
+      
+      if (stParts.length > 0) {
+        parts.push(`### SHORT-TERM CONTEXT & METRICS:\n${stParts.map(s => `- ${s}`).join('\n')}`)
+      }
+    }
+
+    // Format Medium-term memory
+    const crmLines: string[] = []
+    
+    if (deals && deals.length > 0) {
+      deals.forEach((d: any) => {
+        crmLines.push(`- Deal: "${d.title}" | Value: ${d.currency} ${d.value} | Status: ${d.status} (Created: ${new Date(d.created_at).toLocaleDateString()})`)
+      })
+    }
+    
+    if (bookings && bookings.length > 0) {
+      bookings.forEach((b: any) => {
+        crmLines.push(`- Scheduled Meeting: "${b.title}" | Time: ${new Date(b.start_time).toLocaleString()} | Status: ${b.status}`)
+      })
+    }
+
+    if (quotes && quotes.length > 0) {
+      quotes.forEach((q: any) => {
+        crmLines.push(`- Quotation Request: "${q.service_required}" | Total: INR ${q.total_amount} | Status: ${q.status}`)
+      })
+    }
+
+    if (proposals && proposals.length > 0) {
+      proposals.forEach((p: any) => {
+        crmLines.push(`- Proposal Request: "${p.service_required}" | Status: ${p.status}`)
+      })
+    }
+
+    if (crmLines.length > 0) {
+      parts.push(`### MEDIUM-TERM CRM HISTORY:\n${crmLines.join('\n')}`)
+    }
+
+  } catch (err) {
+    console.error('[AI/memory] getUnifiedMemoryContext failed:', err)
+  }
+
+  if (parts.length === 0) return ''
+  
+  return `\n--- UNIFIED CUSTOMER CONTEXT & CRM MEMORY ---\n${parts.join('\n\n')}\n--- END CONTEXT ---\n`
 }

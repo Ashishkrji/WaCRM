@@ -17,10 +17,16 @@ import {
   MessageSquare,
   ChevronDown,
   UserPlus,
+  UserMinus,
+  HelpCircle,
   Check,
   Clock,
   ArrowLeft,
   RefreshCw,
+  Pin,
+  Star,
+  AlertOctagon,
+  Ban,
 } from "lucide-react";
 import { format, isToday, isYesterday, differenceInHours } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +69,10 @@ interface MessageThreadProps {
   onAssignChange: (
     conversationId: string,
     assignedAgentId: string | null,
+  ) => void;
+  onConversationUpdate?: (
+    conversationId: string,
+    updates: Partial<Conversation>,
   ) => void;
   /**
    * On mobile, the thread is shown full-screen with the conversation list
@@ -140,6 +150,7 @@ export function MessageThread({
   onUpdateMessage,
   onStatusChange,
   onAssignChange,
+  onConversationUpdate,
   onBack,
   resyncToken = 0,
   onRefresh,
@@ -173,6 +184,100 @@ export function MessageThread({
     }, 700);
   }, [isRefreshing, onRefresh]);
   const [replyTo, setReplyTo] = useState<ReplyDraft | null>(null);
+  const [viewingTeammates, setViewingTeammates] = useState<{ userId: string; userName: string; typing?: boolean }[]>([]);
+  const conversationId = conversation?.id;
+
+  const presenceChannelRef = useRef<any>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [overrideLock, setOverrideLock] = useState(false);
+
+  useEffect(() => {
+    setOverrideLock(false);
+    setIsTyping(false);
+  }, [conversationId]);
+
+  // Supabase Presence for Collision Detection
+  useEffect(() => {
+    if (!conversationId || !user?.id) return;
+
+    const supabase = createClient();
+    let myName = user.email || "Teammate";
+    const myProfile = profiles.find(p => p.user_id === user.id);
+    if (myProfile?.full_name) {
+      myName = myProfile.full_name;
+    }
+
+    const presenceChannel = supabase.channel(`presence:${conversationId}`, {
+      config: {
+        presence: {
+          key: user.id,
+        },
+      },
+    });
+
+    presenceChannelRef.current = presenceChannel;
+
+    presenceChannel
+      .on("presence", { event: "sync" }, () => {
+        const state = presenceChannel.presenceState();
+        const otherUsers: any[] = [];
+        
+        Object.keys(state).forEach((key) => {
+          if (key !== user.id) {
+            const presenceValues = state[key];
+            if (Array.isArray(presenceValues) && presenceValues.length > 0) {
+              otherUsers.push(presenceValues[0]);
+            }
+          }
+        });
+
+        setViewingTeammates(otherUsers);
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await presenceChannel.track({
+            userId: user.id,
+            userName: myName,
+            onlineAt: new Date().toISOString(),
+            typing: isTyping,
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+      presenceChannelRef.current = null;
+      setViewingTeammates([]);
+    };
+  }, [conversationId, user?.id, profiles, isTyping]);
+
+  const handleTyping = useCallback((typing: boolean) => {
+    setIsTyping(typing);
+  }, []);
+
+  const typingTeammates = useMemo(() => {
+    return viewingTeammates.filter((t) => t.typing === true);
+  }, [viewingTeammates]);
+
+  const isComposerLocked = useMemo(() => {
+    if (overrideLock) return false;
+    return typingTeammates.length > 0;
+  }, [typingTeammates, overrideLock]);
+
+  const typingTeammateNames = useMemo(() => {
+    return typingTeammates.map((t) => t.userName).join(", ");
+  }, [typingTeammates]);
+
+  const handleOverrideLock = useCallback(() => {
+    const myProfile = profiles.find((p) => p.user_id === user?.id);
+    const isAdmin = myProfile?.role === "admin" || myProfile?.role === "super_admin";
+    if (isAdmin) {
+      setOverrideLock(true);
+      toast.success("Lock overridden by administrator");
+    } else {
+      toast.error("Only administrators can override typing locks");
+    }
+  }, [profiles, user?.id]);
 
   // Profiles are bounded by RLS to rows the current user is allowed to
   // see — today that's just the current user, but the dropdown keeps the
@@ -236,7 +341,6 @@ export function MessageThread({
     onMessagesLoadedRef.current = onMessagesLoaded;
   });
 
-  const conversationId = conversation?.id;
   const hasUnread = (conversation?.unread_count ?? 0) > 0;
 
   // Fetch messages whenever the selected conversation changes. Kept
@@ -417,7 +521,7 @@ export function MessageThread({
   }, [messages]);
 
   const handleSend = useCallback(
-    async (text: string, replyToId?: string) => {
+    async (text: string, replyToId?: string, isInternal?: boolean) => {
       if (!conversation) return;
 
       const tempId = `temp-${Date.now()}`;
@@ -432,6 +536,7 @@ export function MessageThread({
         status: "sending",
         created_at: new Date().toISOString(),
         reply_to_message_id: replyToId,
+        is_internal: isInternal,
       };
       onNewMessage(optimisticMsg);
       setReplyTo(null);
@@ -445,6 +550,7 @@ export function MessageThread({
             message_type: "text",
             content_text: text,
             reply_to_message_id: replyToId,
+            is_internal: isInternal,
           }),
         });
 
@@ -673,6 +779,91 @@ export function MessageThread({
     [conversation, onAssignChange],
   );
 
+  const handleRequestHelp = useCallback(async () => {
+    if (!conversationId || !user?.id) return;
+    
+    // 1. Mark status as pending
+    await handleStatusChange("pending");
+    
+    // 2. Insert an internal note
+    const myName = profiles.find(p => p.user_id === user.id)?.full_name || user.email || "Agent";
+    await handleSend(`⚠️ **Help Requested:** ${myName} has requested assistance with this conversation. Please review!`, undefined, true);
+    
+    toast.success("Help request posted as an internal note");
+  }, [conversationId, user?.id, profiles, handleStatusChange, handleSend]);
+
+  const handleTogglePin = useCallback(async () => {
+    if (!conversation) return;
+    const nextVal = !conversation.pinned;
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("conversations")
+      .update({ pinned: nextVal })
+      .eq("id", conversation.id);
+    if (error) {
+      toast.error("Failed to update pin status");
+      return;
+    }
+    if (onConversationUpdate) {
+      onConversationUpdate(conversation.id, { pinned: nextVal });
+    }
+    toast.success(nextVal ? "Conversation pinned" : "Conversation unpinned");
+  }, [conversation, onConversationUpdate]);
+
+  const handleToggleFavorite = useCallback(async () => {
+    if (!conversation) return;
+    const nextVal = !conversation.favorite;
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("conversations")
+      .update({ favorite: nextVal })
+      .eq("id", conversation.id);
+    if (error) {
+      toast.error("Failed to update favorite status");
+      return;
+    }
+    if (onConversationUpdate) {
+      onConversationUpdate(conversation.id, { favorite: nextVal });
+    }
+    toast.success(nextVal ? "Conversation added to favorites" : "Conversation removed from favorites");
+  }, [conversation, onConversationUpdate]);
+
+  const handleToggleSpam = useCallback(async () => {
+    if (!conversation) return;
+    const nextVal = !conversation.spam;
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("conversations")
+      .update({ spam: nextVal })
+      .eq("id", conversation.id);
+    if (error) {
+      toast.error("Failed to update spam status");
+      return;
+    }
+    if (onConversationUpdate) {
+      onConversationUpdate(conversation.id, { spam: nextVal });
+    }
+    toast.success(nextVal ? "Conversation marked as spam" : "Conversation unmarked as spam");
+  }, [conversation, onConversationUpdate]);
+
+  const handleToggleBlocked = useCallback(async () => {
+    if (!conversation) return;
+    const nextVal = !conversation.blocked;
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("conversations")
+      .update({ blocked: nextVal })
+      .eq("id", conversation.id);
+    if (error) {
+      toast.error("Failed to update blocked status");
+      return;
+    }
+    if (onConversationUpdate) {
+      onConversationUpdate(conversation.id, { blocked: nextVal });
+    }
+    toast.success(nextVal ? "Contact blocked" : "Contact unblocked");
+  }, [conversation, onConversationUpdate]);
+
   // Empty state — same WhatsApp-style doodle background as the active
   // thread below, so swapping between empty/selected doesn't change the
   // pattern under the user's eye.
@@ -702,6 +893,51 @@ export function MessageThread({
   const assignLabel = assignedAgentId
     ? (currentAssignee?.full_name ?? "Assigned")
     : "Assign";
+
+  // SLA Calculation
+  const SLA_LIMIT_MINS = 30;
+  const elapsedMins = conversation.last_message_at
+    ? (Date.now() - new Date(conversation.last_message_at).getTime()) / 60000
+    : 0;
+  const isWaiting = conversation.unread_count > 0 && conversation.status !== "closed";
+  const isSlaBreached = isWaiting && elapsedMins > SLA_LIMIT_MINS;
+  const isSlaWarning = isWaiting && elapsedMins > 15 && elapsedMins <= SLA_LIMIT_MINS;
+
+  let slaBadge = null;
+  if (isWaiting && conversation.last_message_at) {
+    const remainingMins = Math.max(0, Math.ceil(SLA_LIMIT_MINS - elapsedMins));
+    if (isSlaBreached) {
+      slaBadge = (
+        <Badge
+          variant="outline"
+          className="ml-1 border-rose-500/30 bg-rose-500/10 text-rose-400 text-[10px] gap-1 sm:inline-flex sm:ml-2"
+        >
+          <Clock className="h-3.5 w-3.5 text-rose-400 animate-pulse" />
+          SLA Breached ({Math.floor(elapsedMins - SLA_LIMIT_MINS)}m)
+        </Badge>
+      );
+    } else if (isSlaWarning) {
+      slaBadge = (
+        <Badge
+          variant="outline"
+          className="ml-1 border-amber-500/30 bg-amber-500/10 text-amber-400 text-[10px] gap-1 sm:inline-flex sm:ml-2"
+        >
+          <Clock className="h-3.5 w-3.5 text-amber-400" />
+          SLA Warning ({remainingMins}m)
+        </Badge>
+      );
+    } else {
+      slaBadge = (
+        <Badge
+          variant="outline"
+          className="ml-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[10px] gap-1 sm:inline-flex sm:ml-2"
+        >
+          <Clock className="h-3.5 w-3.5 text-emerald-400" />
+          SLA: {remainingMins}m
+        </Badge>
+      );
+    }
+  }
 
   return (
     <div className={cn("flex flex-1 flex-col", DOODLE_BG_CLASSES)}>
@@ -740,6 +976,7 @@ export function MessageThread({
             <Clock className="h-3 w-3" />
             {sessionInfo.remaining}
           </Badge>
+          {slaBadge}
         </div>
 
         <div className="flex items-center gap-2">
@@ -765,6 +1002,58 @@ export function MessageThread({
             </button>
           )}
 
+          {/* Pin Toggle */}
+          <button
+            type="button"
+            onClick={handleTogglePin}
+            title={conversation.pinned ? "Unpin conversation" : "Pin conversation"}
+            className={cn(
+              "inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-slate-800",
+              conversation.pinned ? "text-primary fill-primary rotate-45" : "text-slate-400 hover:text-white"
+            )}
+          >
+            <Pin className="h-3.5 w-3.5" />
+          </button>
+
+          {/* Favorite Toggle */}
+          <button
+            type="button"
+            onClick={handleToggleFavorite}
+            title={conversation.favorite ? "Remove from favorites" : "Add to favorites"}
+            className={cn(
+              "inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-slate-800",
+              conversation.favorite ? "text-amber-400 fill-amber-400" : "text-slate-400 hover:text-white"
+            )}
+          >
+            <Star className="h-3.5 w-3.5" />
+          </button>
+
+          {/* Spam Toggle */}
+          <button
+            type="button"
+            onClick={handleToggleSpam}
+            title={conversation.spam ? "Unmark as spam" : "Mark as spam"}
+            className={cn(
+              "inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-slate-800",
+              conversation.spam ? "text-rose-500 fill-rose-500/10" : "text-slate-400 hover:text-white"
+            )}
+          >
+            <AlertOctagon className="h-3.5 w-3.5" />
+          </button>
+
+          {/* Block Toggle */}
+          <button
+            type="button"
+            onClick={handleToggleBlocked}
+            title={conversation.blocked ? "Unblock contact" : "Block contact"}
+            className={cn(
+              "inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-slate-800",
+              conversation.blocked ? "text-rose-650" : "text-slate-400 hover:text-white"
+            )}
+          >
+            <Ban className="h-3.5 w-3.5" />
+          </button>
+
           {/* Status dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger className={cn(
@@ -789,6 +1078,45 @@ export function MessageThread({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Take Over Button */}
+          {assignedAgentId !== user?.id && (
+            <button
+              type="button"
+              onClick={() => handleAssignChange(user?.id || null)}
+              title="Take over this conversation"
+              className="inline-flex h-7 items-center justify-center gap-1 px-2.5 text-xs font-semibold rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+            >
+              <UserPlus className="h-3 w-3" />
+              <span className="hidden md:inline">Take Over</span>
+            </button>
+          )}
+
+          {/* Release Button */}
+          {assignedAgentId === user?.id && (
+            <button
+              type="button"
+              onClick={() => handleAssignChange(null)}
+              title="Release this conversation to unassigned"
+              className="inline-flex h-7 items-center justify-center gap-1 px-2.5 text-xs font-semibold rounded-md bg-slate-800 hover:bg-slate-750 text-slate-300 transition-colors border border-slate-700"
+            >
+              <UserMinus className="h-3 w-3" />
+              <span className="hidden md:inline">Release</span>
+            </button>
+          )}
+
+          {/* Request Help Button */}
+          {conversation.status !== "closed" && (
+            <button
+              type="button"
+              onClick={handleRequestHelp}
+              title="Request assistance from teammates"
+              className="inline-flex h-7 items-center justify-center gap-1 px-2.5 text-xs font-semibold rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 transition-colors"
+            >
+              <HelpCircle className="h-3 w-3" />
+              <span className="hidden md:inline">Request Help</span>
+            </button>
+          )}
 
           {/* Assign dropdown */}
           <DropdownMenu>
@@ -846,6 +1174,15 @@ export function MessageThread({
           </DropdownMenu>
         </div>
       </div>
+
+      {viewingTeammates.length > 0 && (
+        <div className="flex shrink-0 items-center justify-center gap-2 border-b border-indigo-500/20 bg-indigo-500/10 px-4 py-1.5 animate-pulse">
+          <span className="flex h-1.5 w-1.5 rounded-full bg-indigo-400" />
+          <p className="text-[11px] text-indigo-300">
+            ⚠️ <strong>Collision Alert:</strong> {viewingTeammates.map((t) => t.userName).join(", ")} is also viewing this conversation.
+          </p>
+        </div>
+      )}
 
       {/* Messages Area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
@@ -928,6 +1265,10 @@ export function MessageThread({
         onOpenTemplates={handleOpenTemplates}
         replyTo={replyTo}
         onClearReply={() => setReplyTo(null)}
+        onTyping={handleTyping}
+        locked={isComposerLocked}
+        lockedBy={typingTeammateNames}
+        onOverrideLock={handleOverrideLock}
       />
 
       <TemplatePicker

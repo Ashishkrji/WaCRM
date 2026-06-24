@@ -60,6 +60,13 @@ export function DealForm({
   const [assignedTo, setAssignedTo] = useState("");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [probability, setProbability] = useState("100");
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
+  const [services, setServices] = useState("");
+  const [proposalId, setProposalId] = useState("");
+  const [quotationId, setQuotationId] = useState("");
+  const [proposals, setProposals] = useState<any[]>([]);
+  const [quotations, setQuotations] = useState<any[]>([]);
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -89,6 +96,11 @@ export function DealForm({
       setAssignedTo(deal.assigned_to ?? "");
       setExpectedCloseDate(deal.expected_close_date ?? "");
       setNotes(deal.notes ?? "");
+      setProbability(String(deal.probability ?? "100"));
+      setPriority(deal.priority ?? "medium");
+      setServices(deal.services ? deal.services.join(", ") : "");
+      setProposalId(deal.proposal_id ?? "");
+      setQuotationId(deal.quotation_id ?? "");
     } else {
       setTitle("");
       setValue("");
@@ -98,6 +110,11 @@ export function DealForm({
       setAssignedTo("");
       setExpectedCloseDate("");
       setNotes("");
+      setProbability("100");
+      setPriority("medium");
+      setServices("");
+      setProposalId("");
+      setQuotationId("");
     }
   }, [open, deal, defaultStageId, stages]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -127,19 +144,35 @@ export function DealForm({
     if (!open || !contactId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLinkedConversation(null);
+      setProposals([]);
+      setQuotations([]);
       return;
     }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("conversations")
-        .select("*")
-        .eq("contact_id", contactId)
-        .order("last_message_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const [convRes, propRes, quoteRes] = await Promise.all([
+        supabase
+          .from("conversations")
+          .select("*")
+          .eq("contact_id", contactId)
+          .order("last_message_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("proposal_requests")
+          .select("*")
+          .eq("contact_id", contactId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("quotation_requests")
+          .select("*")
+          .eq("contact_id", contactId)
+          .order("created_at", { ascending: false }),
+      ]);
       if (cancelled) return;
-      setLinkedConversation((data as Conversation | null) ?? null);
+      setLinkedConversation((convRes.data as Conversation | null) ?? null);
+      setProposals(propRes.data ?? []);
+      setQuotations(quoteRes.data ?? []);
     })();
     return () => {
       cancelled = true;
@@ -163,6 +196,12 @@ export function DealForm({
       assigned_to: assignedTo || null,
       notes: notes.trim() || null,
       expected_close_date: expectedCloseDate || null,
+      probability: parseFloat(probability) || 0,
+      expected_revenue: (parseFloat(value) || 0) * ((parseFloat(probability) || 0) / 100),
+      priority,
+      services: services.split(",").map((s) => s.trim()).filter(Boolean),
+      proposal_id: proposalId || null,
+      quotation_id: quotationId || null,
     };
 
     if (deal) {
@@ -311,6 +350,84 @@ export function DealForm({
                   <option value="GBP">GBP</option>
                 </select>
               </div>
+            </div>
+
+            <div className="grid grid-cols-[1fr_1fr] gap-3">
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Probability (%)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={probability}
+                  onChange={(e) => setProbability(e.target.value)}
+                  placeholder="100"
+                  className="border-slate-700 bg-slate-800 text-white"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Expected Revenue ({currency})</Label>
+                <div className="flex h-9 items-center rounded-lg border border-slate-700 bg-slate-805 px-3 text-sm text-slate-400">
+                  {((parseFloat(value) || 0) * ((parseFloat(probability) || 0) / 100)).toFixed(2)}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label className="text-slate-300">Priority</Label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as "low" | "medium" | "high")}
+                className="h-9 w-full rounded-lg border border-slate-700 bg-slate-800 px-2.5 text-sm text-white outline-none focus:border-primary"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label className="text-slate-300">Services (comma-separated)</Label>
+              <Input
+                value={services}
+                onChange={(e) => setServices(e.target.value)}
+                placeholder="e.g. SEO, Web Design, Marketing"
+                className="border-slate-700 bg-slate-800 text-white"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label className="text-slate-300">Linked Proposal</Label>
+              <select
+                value={proposalId}
+                onChange={(e) => setProposalId(e.target.value)}
+                disabled={!contactId}
+                className="h-9 w-full rounded-lg border border-slate-700 bg-slate-800 px-2.5 text-sm text-white outline-none focus:border-primary disabled:opacity-50"
+              >
+                <option value="">None</option>
+                {proposals.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.service_required} ({p.status})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label className="text-slate-300">Linked Quotation</Label>
+              <select
+                value={quotationId}
+                onChange={(e) => setQuotationId(e.target.value)}
+                disabled={!contactId}
+                className="h-9 w-full rounded-lg border border-slate-700 bg-slate-800 px-2.5 text-sm text-white outline-none focus:border-primary disabled:opacity-50"
+              >
+                <option value="">None</option>
+                {quotations.map((q) => (
+                  <option key={q.id} value={q.id}>
+                    {q.service_required} - {currency} {q.total_amount} ({q.status})
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid gap-2">

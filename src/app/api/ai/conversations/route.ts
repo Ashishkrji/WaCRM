@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { connectToDatabase } from '@/lib/mongodb'
+import { dbService } from '@/services/db'
 import { type SupabaseClient } from '@supabase/supabase-js'
 
 async function requireUser(): Promise<
@@ -26,13 +26,8 @@ export async function GET() {
   const { supabase, userId } = guard
 
   try {
-    const { db } = await connectToDatabase()
-    
-    // Fetch AI conversations from MongoDB Atlas
-    const mongoAIConvs = await db.collection('ai_conversations')
-      .find({ user_id: userId })
-      .sort({ updated_at: -1 })
-      .toArray()
+    // Fetch AI conversations from MongoDB Atlas via Database Service Layer
+    const mongoAIConvs = await dbService.ai.listAIConversationsByUser(userId)
 
     if (mongoAIConvs.length === 0) {
       return NextResponse.json([])
@@ -41,23 +36,7 @@ export async function GET() {
     const conversationIds = mongoAIConvs.map(c => c.conversation_id)
 
     // Fetch corresponding details from Supabase to join contacts & last messages
-    const { data: supabaseConvs, error: supabaseErr } = await supabase
-      .from('conversations')
-      .select(`
-        id,
-        last_message_text,
-        last_message_at,
-        contacts (
-          id,
-          name,
-          phone
-        )
-      `)
-      .in('id', conversationIds)
-
-    if (supabaseErr) {
-      return NextResponse.json({ error: supabaseErr.message }, { status: 500 })
-    }
+    const supabaseConvs = await dbService.business.findConversationsByIds(conversationIds, supabase)
 
     const supabaseMap = new Map<string, any>(
       (supabaseConvs || []).map(c => [c.id, c])
