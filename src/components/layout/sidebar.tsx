@@ -32,6 +32,13 @@ import {
   Tag,
   Settings2,
   CheckSquare,
+  BookOpen,
+  Headphones,
+  Globe,
+  Receipt,
+  FileText,
+  Shield,
+  AreaChart,
 } from "lucide-react";
 import {
   Avatar,
@@ -66,6 +73,29 @@ const navItems: NavItem[] = [
   { href: "/pipeline-manager", label: "Pipeline Manager", icon: Settings2 },
   { href: "/broadcasts", label: "Broadcasts", icon: Radio },
   { href: "/automations", label: "Automations", icon: Zap },
+  // ── Enterprise Workflow Engine (Part 10) ──────────────────
+  { href: "/workflows", label: "Workflow Engine", icon: Workflow },
+  { href: "/workflows/templates", label: "WF Templates", icon: Sparkles },
+  // ── Analytics & BI (Part 11) ────────────────────────────
+  { href: "/analytics/executive", label: "Executive BI", icon: BarChart3 },
+  { href: "/analytics/sales", label: "Sales Analytics", icon: BarChart3 },
+  { href: "/analytics/ai-usage", label: "AI Usage", icon: Bot },
+  { href: "/analytics/reports", label: "Reports & Alerts", icon: ListFilter },
+  // ── GST & Billing (Part 12) ─────────────────────────────
+  { href: "/billing", label: "GST Billing", icon: Receipt },
+  { href: "/billing/new", label: "New Invoice", icon: FileText },
+  { href: "/gst-reports", label: "GST Returns", icon: BarChart3 },
+  { href: "/payment-history", label: "Payment History", icon: CreditCard },
+  // ── Knowledge Base (Part 13) ─────────────────────────────
+  { href: "/knowledge", label: "Knowledge Base", icon: BookOpen },
+  // ── Customer Support (Part 14) ──────────────────────────
+  { href: "/support", label: "Support Tickets", icon: Headphones },
+  { href: "/support/settings", label: "Support Settings", icon: Settings2 },
+  // ── SEO Module (Part 15) ────────────────────────────────
+  { href: "/seo", label: "SEO & Marketing", icon: Globe },
+  // ── SaaS Admin (Part 16) ────────────────────────────────
+  { href: "/admin", label: "Admin Panel", icon: Shield },
+  // ── Existing ────────────────────────────────────────────
   { href: "/flows", label: "Flows", icon: Workflow, beta: true },
   { href: "/templates", label: "Templates", icon: MessageSquare },
   { href: "/quick-replies", label: "Quick Replies", icon: MessageSquare },
@@ -75,14 +105,14 @@ const navItems: NavItem[] = [
   { href: "/integrations", label: "Integrations", icon: Webhook },
   { href: "/widgets", label: "Chat Widget", icon: MessageCircle },
   { href: "/ai-router", label: "AI Router", icon: Bot },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/analytics", label: "Analytics (Legacy)", icon: BarChart3 },
   { href: "/team", label: "Team", icon: Users },
   { href: "/workspace", label: "Workspace & Branding", icon: Building2 },
   { href: "/appearance", label: "Appearance", icon: Palette },
 ];
 
 const bottomNavItems = [
-  { href: "/support", label: "Help & Support", icon: HelpCircle },
+  { href: "/docs", label: "Help & Docs", icon: HelpCircle },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { 
   BarChart3, 
@@ -18,9 +19,24 @@ import {
   TrendingDown,
   ChevronRight,
   ShieldCheck,
+  Bot,
+  GitBranch,
+  ListFilter,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+
+// ── BI Navigation Banner ─────────────────────────────────────
+const BI_LINKS = [
+  { href: "/analytics/executive", label: "Executive BI", icon: BarChart3, color: "text-violet-400 border-violet-500/30 bg-violet-500/10" },
+  { href: "/analytics/sales", label: "Sales", icon: TrendingUp, color: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10" },
+  { href: "/analytics/customers", label: "Customers", icon: Users, color: "text-blue-400 border-blue-500/30 bg-blue-500/10" },
+  { href: "/analytics/employees", label: "Employees", icon: UserCheck, color: "text-orange-400 border-orange-500/30 bg-orange-500/10" },
+  { href: "/analytics/ai-usage", label: "AI Usage", icon: Bot, color: "text-purple-400 border-purple-500/30 bg-purple-500/10" },
+  { href: "/analytics/marketing", label: "Marketing", icon: GitBranch, color: "text-pink-400 border-pink-500/30 bg-pink-500/10" },
+  { href: "/analytics/reports", label: "Reports & Alerts", icon: ListFilter, color: "text-cyan-400 border-cyan-500/30 bg-cyan-500/10" },
+]
+
 
 interface AnalyticsStats {
   totalContacts: number;

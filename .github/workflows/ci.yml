@@ -13,26 +13,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Lint, typecheck, test, build
+  quality-gate:
+    name: Lint, Typecheck, Security Audit, Unit Tests
     runs-on: ubuntu-latest
-    # Dummy env vars so `next build` doesn't fail when it reads the
-    # public Supabase config at build time. These never leave CI and
-    # never hit a real service — they just satisfy the `!` non-null
-    # assertions in the client factories. ENCRYPTION_KEY and
-    # META_APP_SECRET are read at module-load by lib/whatsapp/*; the
-    # test suite asserts behaviour around these values, so any non-
-    # empty placeholder works as long as it stays consistent with
-    # vitest.config.ts.
     env:
       NEXT_PUBLIC_SUPABASE_URL: https://ci.example.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-dummy-anon-key
       ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
       META_APP_SECRET: 'ci-dummy-meta-secret'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
@@ -40,14 +32,76 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Security Audit
+        run: npm audit --audit-level=high
+
       - name: Lint
         run: npm run lint
 
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
+      - name: Unit & Integration Tests (Vitest)
         run: npm test
 
-      - name: Build
-        run: npm run build
+  build:
+    name: Build Application
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-dummy-anon-key
+      ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+      META_APP_SECRET: 'ci-dummy-meta-secret'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      
+      # Persist the build artifact for E2E tests
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-build
+          path: .next/
+          retention-days: 1
+
+  e2e-tests:
+    name: End-to-End Tests (Playwright)
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-dummy-anon-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: next-build
+          path: .next/
+          
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+        
+      - name: Run Playwright Tests
+        run: npx playwright test
+        
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+

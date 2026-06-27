@@ -54,6 +54,7 @@ const SECURITY_HEADERS = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   /**
    * Cache-Control policy.
    *

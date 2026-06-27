@@ -545,3 +545,444 @@ export interface CrmSettings {
   created_at: string;
   updated_at: string;
 }
+
+// ============================================================
+// Enterprise Workflow Automation Engine (migrations 027–028)
+// ============================================================
+
+export type WorkflowNodeType =
+  | 'trigger'
+  | 'condition'
+  | 'decision'
+  | 'delay'
+  | 'loop'
+  | 'approval'
+  | 'action'
+  | 'webhook'
+  | 'ai_node'
+  | 'end';
+
+export type WorkflowStatus = 'draft' | 'published' | 'archived';
+export type WorkflowCategory =
+  | 'crm' | 'lead' | 'sales' | 'marketing' | 'support' | 'ai'
+  | 'meeting' | 'proposal' | 'quotation' | 'payment' | 'retention' | 'custom';
+
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'escalated' | 'timed_out';
+export type ApprovalMode = 'sequential' | 'parallel' | 'any_one';
+export type ScheduleType = 'once' | 'recurring' | 'cron';
+export type WebhookDirection = 'incoming' | 'outgoing';
+
+// Workflow (extends the existing `workflows` table from migration 027)
+export interface Workflow {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  trigger_type: string;
+  trigger_config: Record<string, unknown>;
+  is_active: boolean;
+  version: number;
+  status: WorkflowStatus;
+  is_template: boolean;
+  category: WorkflowCategory;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  // Populated joins
+  nodes?: WorkflowNode[];
+  edges?: WorkflowEdge[];
+  execution_count?: number;
+}
+
+// Visual canvas node
+export interface WorkflowNode {
+  id: string;
+  workflow_id: string;
+  user_id: string;
+  node_type: WorkflowNodeType;
+  label: string;
+  config: WorkflowNodeConfig;
+  pos_x: number;
+  pos_y: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Node config union
+export type WorkflowNodeConfig =
+  | TriggerNodeConfig
+  | ConditionNodeConfig
+  | DecisionNodeConfig
+  | DelayNodeConfig
+  | ActionNodeConfig
+  | ApprovalNodeConfig
+  | WebhookNodeConfig
+  | AINodeConfig
+  | Record<string, unknown>;
+
+export interface TriggerNodeConfig {
+  event: string;
+  filter?: Record<string, unknown>;
+}
+
+export interface ConditionNodeConfig {
+  subject: string;
+  operator?: string;
+  value?: string | number | boolean;
+}
+
+export interface DecisionNodeConfig {
+  use_ai: boolean;
+  ai_prompt?: string;
+  conditions?: Array<{ field: string; operator: string; value: unknown; target: string }>;
+}
+
+export interface DelayNodeConfig {
+  amount: number;
+  unit: 'minutes' | 'hours' | 'days' | 'weeks';
+  reference?: string; // e.g. 'due_date', 'meeting_date'
+}
+
+export interface ActionNodeConfig {
+  action: string; // e.g. 'send_message', 'create_task', 'assign_agent', 'send_invoice' ...
+  [key: string]: unknown;
+}
+
+export interface ApprovalNodeConfig {
+  title: string;
+  description?: string;
+  approvers: string[];
+  approval_mode: ApprovalMode;
+  escalation_after_hours?: number;
+  escalate_to?: string;
+}
+
+export interface WebhookNodeConfig {
+  url: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  headers?: Record<string, string>;
+  body_template?: string;
+}
+
+export interface AINodeConfig {
+  agent_type: string;
+  prompt?: string;
+  search_knowledge?: boolean;
+  generate_offer?: boolean;
+  model?: string;
+}
+
+// Canvas edge (connection between nodes)
+export interface WorkflowEdge {
+  id: string;
+  workflow_id: string;
+  user_id: string;
+  source_node_id: string;
+  target_node_id: string;
+  edge_label: string; // 'default', 'yes', 'no', custom branch label
+  created_at: string;
+}
+
+// Approval request generated during workflow execution
+export interface WorkflowApproval {
+  id: string;
+  workflow_id: string;
+  execution_id?: string;
+  user_id: string;
+  node_id?: string;
+  title: string;
+  description?: string;
+  status: ApprovalStatus;
+  approvers: string[];
+  approval_mode: ApprovalMode;
+  responses: ApprovalResponse[];
+  context: Record<string, unknown>;
+  escalation_after_hours?: number;
+  escalate_to?: string;
+  due_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApprovalResponse {
+  approver_id: string;
+  action: 'approved' | 'rejected';
+  comment?: string;
+  at: string;
+}
+
+// Scheduled job
+export interface WorkflowSchedule {
+  id: string;
+  workflow_id: string;
+  user_id: string;
+  schedule_type: ScheduleType;
+  schedule_value: string;
+  timezone: string;
+  business_hours_only: boolean;
+  holiday_dates: string[];
+  is_active: boolean;
+  last_fired_at?: string;
+  next_fire_at?: string;
+  fire_count: number;
+  max_fires?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Webhook configuration
+export interface WorkflowWebhook {
+  id: string;
+  user_id: string;
+  workflow_id?: string;
+  name: string;
+  direction: WebhookDirection;
+  endpoint_slug?: string;
+  target_url?: string;
+  secret?: string;
+  headers: Record<string, string>;
+  retry_config: { max_attempts: number; backoff_seconds: number };
+  rate_limit_config: { requests_per_minute: number };
+  is_active: boolean;
+  total_received: number;
+  total_sent: number;
+  last_triggered_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Webhook delivery log
+export interface WorkflowWebhookLog {
+  id: string;
+  webhook_id: string;
+  user_id: string;
+  status: string;
+  http_status?: number;
+  request_body?: Record<string, unknown>;
+  response_body?: string;
+  attempt_number: number;
+  latency_ms?: number;
+  error_message?: string;
+  created_at: string;
+}
+
+// Enterprise workflow template
+export interface WorkflowTemplate {
+  id: string;
+  user_id?: string;
+  slug: string;
+  name: string;
+  description?: string;
+  category: WorkflowCategory;
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+  trigger_type: string;
+  trigger_config: Record<string, unknown>;
+  tags: string[];
+  is_system: boolean;
+  use_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// AI routing decision log
+export interface AIRoutingDecision {
+  id: string;
+  user_id: string;
+  workflow_id?: string;
+  execution_id?: string;
+  contact_id?: string;
+  input_context: Record<string, unknown>;
+  model: string;
+  intent?: string;
+  sentiment?: string;
+  confidence?: number;
+  decision?: string;
+  raw_response?: Record<string, unknown>;
+  latency_ms?: number;
+  created_at: string;
+}
+
+// ============================================================
+// Analytics & Business Intelligence (migration 029)
+// ============================================================
+
+// Daily aggregated KPI snapshot
+export interface AnalyticsSnapshot {
+  id: string;
+  user_id: string;
+  snapshot_date: string;
+  new_leads: number;
+  qualified_leads: number;
+  hot_leads: number;
+  won_deals: number;
+  lost_deals: number;
+  revenue: number;
+  pipeline_value: number;
+  avg_deal_size: number;
+  new_customers: number;
+  active_customers: number;
+  inactive_customers: number;
+  churn_count: number;
+  total_conversations: number;
+  avg_response_time_seconds: number;
+  avg_resolution_time_seconds: number;
+  ai_requests: number;
+  ai_tokens_used: number;
+  ai_cost_usd: number;
+  ai_escalations: number;
+  ai_confidence_avg: number;
+  campaigns_sent: number;
+  campaign_reach: number;
+  workflows_executed: number;
+  workflow_success_rate: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+// Configurable alert rule
+export interface AnalyticsAlert {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  metric: string;
+  operator: 'gt' | 'lt' | 'gte' | 'lte' | 'eq' | 'neq';
+  threshold: number;
+  severity: 'critical' | 'warning' | 'info';
+  is_active: boolean;
+  cooldown_minutes: number;
+  channels: string[];
+  last_triggered_at?: string;
+  trigger_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Alert triggered event
+export interface AnalyticsAlertEvent {
+  id: string;
+  alert_id: string;
+  user_id: string;
+  metric: string;
+  actual_value: number;
+  threshold: number;
+  severity: string;
+  message: string;
+  is_acknowledged: boolean;
+  acknowledged_at?: string;
+  acknowledged_by?: string;
+  created_at: string;
+}
+
+// Saved report configuration
+export interface BiReport {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  report_type: string;
+  config: BiReportConfig;
+  schedule?: string;
+  recipients: string[];
+  export_format: 'pdf' | 'csv' | 'json' | 'excel';
+  last_generated_at?: string;
+  generate_count: number;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BiReportConfig {
+  date_range?: { from: string; to: string } | { preset: string };
+  columns?: string[];
+  filters?: Record<string, unknown>[];
+  chart_type?: 'bar' | 'line' | 'pie' | 'area' | 'table';
+  group_by?: string;
+  sort_by?: string;
+  sort_dir?: 'asc' | 'desc';
+  limit?: number;
+}
+
+// KPI target
+export interface KpiTarget {
+  id: string;
+  user_id: string;
+  metric: string;
+  period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annual';
+  target_value: number;
+  currency?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Daily AI cost tracking record
+export interface CostTrackingRecord {
+  id: string;
+  user_id: string;
+  tracking_date: string;
+  provider: string;
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  request_count: number;
+  success_count: number;
+  failure_count: number;
+  avg_latency_ms: number;
+  estimated_cost_usd: number;
+  created_at: string;
+}
+
+// AI-generated business insight
+export interface AIInsight {
+  id: string;
+  user_id: string;
+  insight_type: string;
+  title: string;
+  body: string;
+  sentiment: 'positive' | 'negative' | 'neutral' | 'warning';
+  action?: string;
+  action_url?: string;
+  priority: number;
+  is_dismissed: boolean;
+  expires_at?: string;
+  created_at: string;
+}
+
+// Executive dashboard data bundle
+export interface ExecutiveDashboardData {
+  today: {
+    revenue: number;
+    leads: number;
+    meetings: number;
+    deals_won: number;
+    conversations: number;
+    ai_requests: number;
+  };
+  trends: {
+    revenue_7d: Array<{ date: string; value: number }>;
+    leads_7d: Array<{ date: string; value: number }>;
+  };
+  pipeline: {
+    total_value: number;
+    open_count: number;
+    pending_proposals: number;
+    pending_quotations: number;
+  };
+  ai: {
+    total_requests: number;
+    success_rate: number;
+    avg_latency_ms: number;
+    cost_usd: number;
+  };
+  workflows: {
+    active_count: number;
+    executions_today: number;
+    success_rate: number;
+    pending_approvals: number;
+  };
+  alerts: AnalyticsAlertEvent[];
+  insights: AIInsight[];
+}
+
