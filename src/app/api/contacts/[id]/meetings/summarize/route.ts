@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { dbService } from '@/services/db';
-import { tryGetAIProvider } from '@/lib/ai/provider-factory';
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
+import { tryGetAIProvider } from '@/services/ai/orchestrator';
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const resolvedParams = await params;
+  const contactId = resolvedParams.id;
   const supabase = await createClient();
   const {
     data: { user },
@@ -17,7 +19,6 @@ export async function POST(
   }
 
   const userId = user.id;
-  const contactId = params.id;
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -74,7 +75,7 @@ export async function POST(
       ]
     };
 
-    const routerConfig = await dbService.business.getAIRouterConfig(userId, supabase);
+    const routerConfig = await aiRouterRepo.getByUserId(userId);
     const activeProviderName = routerConfig?.ai_provider || 'nvidia';
     const provider = tryGetAIProvider(activeProviderName);
 
@@ -150,7 +151,7 @@ Return EXACTLY this JSON structure:
 
     // 5. Save deep meeting summary in MongoDB Atlas
     try {
-      await dbService.ai.saveMeetingSummary(meetingId, userId, summaryData);
+      await aiDataRepo.saveMeetingSummary(meetingId, userId, summaryData);
     } catch (mongoErr) {
       console.error('[Meeting Summarize API] MongoDB save failed:', mongoErr);
     }
@@ -188,7 +189,7 @@ Return EXACTLY this JSON structure:
 
     // 7. Update AI memory with the latest meeting results
     try {
-      await dbService.ai.updateContactMemory(userId, contactId, {
+      await memoryRepo.updateContactMemory(userId, contactId, {
         facts: {
           last_meeting_date: new Date().toISOString(),
           last_meeting_topic: meeting.title || 'Consultation',

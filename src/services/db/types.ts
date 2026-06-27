@@ -1,4 +1,4 @@
-import type { MessageIntent } from '@/lib/ai/types'
+import type { MessageIntent } from '@/services/ai/types'
 
 export interface MongoWebhookLog {
   _id?: any

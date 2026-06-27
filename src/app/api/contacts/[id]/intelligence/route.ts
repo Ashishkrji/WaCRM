@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { dbService } from '@/services/db';
-import { tryGetAIProvider } from '@/lib/ai/provider-factory';
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
+import { tryGetAIProvider } from '@/services/ai/orchestrator';
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const resolvedParams = await params;
+  const contactId = resolvedParams.id;
   const supabase = await createClient();
   const {
     data: { user },
@@ -17,7 +19,6 @@ export async function GET(
   }
 
   const userId = user.id;
-  const contactId = params.id;
 
   try {
     // 1. Fetch contact details from Supabase to verify owner/existence
@@ -38,7 +39,7 @@ export async function GET(
     // 2. Query MongoDB Memory
     let memory: any = null;
     try {
-      memory = await dbService.ai.getContactMemory(userId, contactId);
+      memory = await memoryRepo.getContactMemory(userId, contactId);
     } catch (memErr) {
       console.warn('[Intelligence API] getContactMemory failed:', memErr);
     }
@@ -54,7 +55,7 @@ export async function GET(
     let summary: any = null;
     if (conversation) {
       try {
-        summary = await dbService.ai.getSummary(conversation.id);
+        summary = await aiDataRepo.getSummary(conversation.id);
       } catch (sumErr) {
         console.warn('[Intelligence API] getSummary failed:', sumErr);
       }
@@ -63,7 +64,7 @@ export async function GET(
     // 4. Fetch recent messages, notes, and deals to feed AI analysis
     const [recentMessages, contactNotes, contactDeals] = await Promise.all([
       conversation
-        ? dbService.business.getRecentMessages(conversation.id, 15, supabase).catch(() => [])
+        ? messageRepo.getRecentMessages(conversation.id, 15).catch(() => [])
         : Promise.resolve([]),
       supabase
         .from('contact_notes')
@@ -113,7 +114,7 @@ export async function GET(
     };
 
     // Resolve provider/model overrides to run active model
-    const routerConfig = await dbService.business.getAIRouterConfig(userId, supabase);
+    const routerConfig = await aiRouterRepo.getByUserId(userId);
     const activeProviderName = routerConfig?.ai_provider || 'nvidia';
     const provider = tryGetAIProvider(activeProviderName);
 

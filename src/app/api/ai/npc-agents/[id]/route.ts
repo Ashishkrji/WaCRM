@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { chatWithAgent } from '@/lib/ai/agent-builder'
+import { chatWithAgent } from '@/services/ai/agent-builder'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 
 // GET /api/ai/npc-agents/[id]

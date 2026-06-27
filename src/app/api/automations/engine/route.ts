@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   }
 
   await runAutomationsForTrigger({
-    userId: user.id,
+    organizationId: user.id,
     triggerType: body.trigger_type as AutomationTriggerType,
     contactId: body.contact_id ?? null,
     context: body.context ?? {},

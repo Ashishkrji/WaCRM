@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getAIProvider } from '@/lib/ai/provider-factory'
-import { searchKnowledge } from '@/lib/ai/knowledge/embeddings'
-import { dbService } from '@/services/db'
+import { getAIProvider } from '@/services/ai/orchestrator'
+import { searchKnowledge } from '@/services/knowledge/embeddings'
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
 
 export async function POST(request: Request) {
   const supabase = await createClient()
 
   try {
     const body = (await request.json().catch(() => null)) as {
-      userId?: string
+      organizationId?: string
       contactId?: string
       name?: string
       email?: string
@@ -22,10 +22,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
     }
 
-    const { userId, contactId, name, email, phone, message, wantsHuman = false } = body
+    const { organizationId, contactId, name, email, phone, message, wantsHuman = false } = body
 
     // 1. Resolve workspace owner user_id
-    let ownerId = userId
+    let ownerId = organizationId
     if (!ownerId) {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
@@ -150,8 +150,8 @@ export async function POST(request: Request) {
       })
 
       // Update AI Conversation in MongoDB Atlas
-      await dbService.ai.upsertAIConversation(conversationId, {
-        userId: ownerId,
+      await aiDataRepo.upsertAIConversation(conversationId, {
+        organizationId: ownerId,
         aiActive: false,
         handedOffAt: new Date(),
       })
@@ -249,15 +249,15 @@ Draft a helpful response to the visitor:`
       .eq('id', conversationId)
 
     // Save AI Conversation in MongoDB Atlas
-    await dbService.ai.upsertAIConversation(conversationId, {
-      userId: ownerId,
+    await aiDataRepo.upsertAIConversation(conversationId, {
+      organizationId: ownerId,
       aiActive: true,
       handedOffAt: null,
     })
 
     // Log Sentiment Analysis to MongoDB Atlas
-    await dbService.ai.logSentimentAnalysis({
-      userId: ownerId,
+    await aiDataRepo.logSentimentAnalysis({
+      organizationId: ownerId,
       contactId: finalContactId,
       conversationId,
       text: message,
@@ -280,3 +280,4 @@ Draft a helpful response to the visitor:`
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { dbService } from '@/services/db'
-import { DEFAULT_AGENTS } from '@/lib/ai/agents/defaults'
-import type { AIAgentId, AIAgentConfig } from '@/lib/ai/types'
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
+import { DEFAULT_AGENTS } from '@/services/ai/agents/defaults'
+import type { AIAgentId, AIAgentConfig } from '@/services/ai/types'
 
 async function requireUser(): Promise<
   | { ok: true; userId: string }
@@ -26,7 +26,7 @@ export async function GET() {
   const { userId } = auth
 
   try {
-    const dbAgents = await dbService.ai.listAIAgents(userId)
+    const dbAgents = await aiDataRepo.listAIAgents(userId)
     const dbAgentsMap = new Map(dbAgents.map((a) => [a.agentId, a]))
 
     // Merge defaults with DB overrides
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
     if (priority !== undefined) updates.priority = Number(priority)
     if (tools !== undefined) updates.tools = Array.isArray(tools) ? tools.map(String) : []
 
-    await dbService.ai.upsertAIAgent(userId, agentId, updates)
+    await aiDataRepo.upsertAIAgent(userId, agentId, updates)
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

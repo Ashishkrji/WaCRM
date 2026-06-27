@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getAIProvider } from '@/lib/ai/provider-factory'
-import { dbService } from '@/services/db'
+import { getAIProvider } from '@/services/ai/orchestrator'
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
 
 async function requireUser() {
   const supabase = await createClient()
@@ -115,8 +115,8 @@ You must respond with a VALID, RAW JSON object only, with no markdown formatting
 
     // Save generated strategy to MongoDB
     const targetCampaignId = campaignId || `temp_campaign_${Date.now()}`
-    await dbService.ai.saveCampaignStrategy(targetCampaignId, userId, parsedStrategy)
-    await dbService.ai.saveMarketingPredictions(targetCampaignId, parsedStrategy.expectedEngagement)
+    await aiDataRepo.saveCampaignStrategy(targetCampaignId, userId, parsedStrategy)
+    await aiDataRepo.saveMarketingPredictions(targetCampaignId, parsedStrategy.expectedEngagement)
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { getAIProvider } from '@/lib/ai/provider-factory'
-import type { AIMessage } from '@/lib/ai/types'
+import { getAIProvider } from '@/services/ai/orchestrator'
+import type { AIMessage } from '@/services/ai/types'
 
 async function requireUser() {
   const supabase = await createClient()

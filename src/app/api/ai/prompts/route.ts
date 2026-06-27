@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { dbService } from '@/services/db'
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
 import { type SupabaseClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
@@ -26,7 +26,7 @@ export async function GET() {
 
   try {
     // Fetch templates from MongoDB Atlas using the Database Service Layer
-    const templates = await dbService.ai.listPromptTemplates(guard.userId)
+    const templates = await aiDataRepo.listPromptTemplates(guard.userId)
 
     const formatted = templates.map(t => ({
       id: t.id || t._id.toString(),
@@ -62,11 +62,11 @@ export async function POST(request: Request) {
 
     // If setting as default, unset other defaults for this user via dbService
     if (is_default) {
-      await dbService.ai.unsetDefaultPromptTemplates(guard.userId)
+      await aiDataRepo.unsetDefaultPromptTemplates(guard.userId)
     }
 
     // Upsert prompt template via dbService
-    await dbService.ai.upsertPromptTemplate(guard.userId, templateId, {
+    await aiDataRepo.upsertPromptTemplate(guard.userId, templateId, {
       name,
       description,
       content,
@@ -95,7 +95,7 @@ export async function DELETE(request: Request) {
     }
 
     // Delete prompt template via dbService
-    await dbService.ai.deletePromptTemplate(guard.userId, id)
+    await aiDataRepo.deletePromptTemplate(guard.userId, id)
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

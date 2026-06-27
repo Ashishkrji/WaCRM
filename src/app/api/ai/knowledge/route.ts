@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { dbService } from '@/services/db'
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
 import { type SupabaseClient } from '@supabase/supabase-js'
-import { ingestText, fetchWebsiteContent, crawlWebsite } from '@/lib/ai/knowledge/ingest'
+import { ingestText, fetchWebsiteContent, crawlWebsite } from '@/services/knowledge/ingest'
 import crypto from 'crypto'
 
 async function requireUser(): Promise<
@@ -27,7 +27,7 @@ export async function GET() {
 
   try {
     // Fetch documents from MongoDB Atlas via Database Service Layer
-    const documents = await dbService.ai.listKnowledgeBase(guard.userId)
+    const documents = await aiDataRepo.listKnowledgeBase(guard.userId)
 
     const formatted = documents.map(doc => ({
       id: doc.id || doc._id.toString(),
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
     }
 
     // Insert doc via dbService
-    await dbService.ai.insertKnowledgeDoc(doc)
+    await aiDataRepo.insertKnowledgeDoc(doc)
 
     // Trigger background ingestion
     if (content) {
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
           const crawledPages = await crawlWebsite(source_url, crawl_depth, max_pages)
 
           if (crawledPages.length === 0) {
-            await dbService.ai.updateKnowledgeDoc(docId, {
+            await aiDataRepo.updateKnowledgeDoc(docId, {
               status: 'failed',
               error_message: 'No readable pages crawled from start URL.',
               updated_at: new Date(),
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
 
           // First page content updates the primary document
           const firstPage = crawledPages[0]
-          await dbService.ai.updateKnowledgeDoc(docId, {
+          await aiDataRepo.updateKnowledgeDoc(docId, {
             title: firstPage.title || title,
             content: firstPage.content,
             updated_at: new Date(),
@@ -169,7 +169,7 @@ export async function POST(request: Request) {
               updated_at: new Date(),
             }
 
-            await dbService.ai.insertKnowledgeDoc(subDoc)
+            await aiDataRepo.insertKnowledgeDoc(subDoc)
 
             await ingestText({
               userId,
@@ -186,7 +186,7 @@ export async function POST(request: Request) {
           const errMsg = err instanceof Error ? err.message : String(err)
           console.error('[knowledge/ingest] Website crawl/ingest failed:', errMsg)
           
-          await dbService.ai.updateKnowledgeDoc(docId, {
+          await aiDataRepo.updateKnowledgeDoc(docId, {
             status: 'failed',
             error_message: `Crawl failed: ${errMsg}`,
             updated_at: new Date(),
@@ -220,7 +220,7 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    const doc = await dbService.ai.getKnowledgeDoc(userId, id)
+    const doc = await aiDataRepo.getKnowledgeDoc(userId, id)
 
     if (!doc) {
       return NextResponse.json(
@@ -230,7 +230,7 @@ export async function DELETE(request: Request) {
     }
 
     // Delete embeddings first via dbService
-    await dbService.ai.deleteKnowledgeEmbeddings(doc.id)
+    await knowledgeRepo.deleteKnowledgeEmbeddings(doc.id)
 
     // Delete file from Supabase Storage if storage_path exists
     if (doc.storage_path) {
@@ -244,7 +244,7 @@ export async function DELETE(request: Request) {
     }
 
     // Delete from MongoDB knowledge_base via dbService
-    await dbService.ai.deleteKnowledgeDoc(doc.id)
+    await aiDataRepo.deleteKnowledgeDoc(doc.id)
 
     return NextResponse.json({ success: true, message: 'Document deleted successfully' })
   } catch (error) {
@@ -253,3 +253,4 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+

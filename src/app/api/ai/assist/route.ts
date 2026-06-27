@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { dbService } from '@/services/db'
-import { tryGetAIProvider } from '@/lib/ai/provider-factory'
-import { searchKnowledge, formatKnowledgeForPrompt } from '@/lib/ai/knowledge/embeddings'
-import { getUnifiedMemoryContext } from '@/lib/ai/memory'
-import { DEFAULT_AGENTS } from '@/lib/ai/agents/defaults'
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
+import { tryGetAIProvider } from '@/services/ai/orchestrator'
+import { searchKnowledge, formatKnowledgeForPrompt } from '@/services/knowledge/embeddings'
+import { getUnifiedMemoryContext } from '@/services/ai/memory'
+import { DEFAULT_AGENTS } from '@/services/ai/agents/defaults'
 
 import { type SupabaseClient } from '@supabase/supabase-js'
 
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     }
 
     // Fetch conversation details to get contact_id and verify user ownership
-    const conversation = await dbService.business.findConversationById(conversationId, supabase)
+    const conversation = await conversationRepo.findById(conversationId)
     if (!conversation) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     const contactId = conversation.contact_id
 
     // Fetch recent messages (history)
-    const recentMessages = await dbService.business.getRecentMessages(conversationId, 20, supabase)
+    const recentMessages = await messageRepo.getRecentMessages(conversationId, 20)
     
     // Map to AIMessage format and reverse to chronological order
     const history = [...recentMessages]
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
     }
 
     // Get team assistant configuration
-    let agentConfig = await dbService.ai.getAIAgent(userId, 'team_assistant')
+    let agentConfig = await aiDataRepo.getAIAgent(userId, 'team_assistant')
     if (!agentConfig || !agentConfig.enabled) {
       const defaultDef = DEFAULT_AGENTS['team_assistant']
       agentConfig = {
@@ -108,7 +108,7 @@ export async function POST(req: Request) {
       .eq('user_id', userId)
 
     // Resolve provider/model overrides
-    const routerConfig = await dbService.business.getAIRouterConfig(userId, supabase)
+    const routerConfig = await aiRouterRepo.getByUserId(userId)
     const activeProviderName = agentConfig.provider || routerConfig?.ai_provider || 'nvidia'
     const activeModelName = agentConfig.model || routerConfig?.model
     const activeTemperature = agentConfig.temperature ?? 0.7
@@ -179,3 +179,4 @@ containing up to 3 shortcuts of the quick replies that are most relevant to the 
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
+

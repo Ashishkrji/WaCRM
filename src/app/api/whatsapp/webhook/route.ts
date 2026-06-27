@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { dbService } from '@/services/db'
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
 import { createClient } from '@supabase/supabase-js'
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption'
 import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api'
@@ -7,8 +7,8 @@ import { normalizePhone, phonesMatch } from '@/lib/whatsapp/phone-utils'
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
-import { dispatchAIReply } from '@/lib/ai/engine'
-import { logWebhook } from '@/lib/ai/mongodb-logger'
+import { dispatchAIReply } from '@/services/ai/engine'
+import { logWebhook } from '@/services/ai/mongodb-logger'
 
 // Lazy-initialized to avoid build-time crash when env vars are missing
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -221,7 +221,7 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
 
       // Log the incoming webhook to MongoDB Atlas
       void logWebhook({
-        userId: config.user_id,
+        organizationId: config.user_id,
         direction: 'inbound',
         payload: value,
         status: 'received',
@@ -348,14 +348,14 @@ async function handleStatusUpdate(status: {
  * Runs on a best-effort basis — failures here must not break the
  * main inbound-message flow, so errors are swallowed with a log.
  */
-async function flagBroadcastReplyIfAny(userId: string, contactId: string) {
+async function flagBroadcastReplyIfAny(organizationId: string, contactId: string) {
   try {
     // Most recent outbound broadcast that hasn't been replied to yet.
     const { data: recs, error } = await supabaseAdmin()
       .from('broadcast_recipients')
       .select('id, status, broadcast_id, broadcasts!inner(user_id)')
       .eq('contact_id', contactId)
-      .eq('broadcasts.user_id', userId)
+      .eq('broadcasts.user_id', organizationId)
       .in('status', ['sent', 'delivered', 'read'])
       .order('created_at', { ascending: false })
       .limit(1)
@@ -460,7 +460,7 @@ async function handleReaction(
 async function processMessage(
   message: WhatsAppMessage,
   contact: { profile: { name: string }; wa_id: string },
-  userId: string,
+  organizationId: string,
   accessToken: string
 ) {
   const senderPhone = normalizePhone(message.from)
@@ -468,7 +468,7 @@ async function processMessage(
 
   // Find or create contact
   const contactOutcome = await findOrCreateContact(
-    userId,
+    organizationId,
     senderPhone,
     contactName
   )
@@ -477,7 +477,7 @@ async function processMessage(
 
   // Find or create conversation
   const conversation = await findOrCreateConversation(
-    userId,
+    organizationId,
     contactRecord.id
   )
   if (!conversation) return
@@ -534,21 +534,21 @@ async function processMessage(
       ? 'image'   // stickers are images
       : 'text'    // reaction, unknown → text fallback
 
-  const priorCustomerMsgCount = await dbService.business.countCustomerMessages(conversation.id)
+  const priorCustomerMsgCount = await messageRepo.countCustomerMessages(conversation.id)
   const isFirstInboundMessage = priorCustomerMsgCount === 0
 
   try {
-    await dbService.business.createMessage({
+    await messageRepo.create({
       conversation_id: conversation.id,
       sender_type: 'customer',
-      content_type: contentType,
-      content_text: contentText,
-      media_url: mediaUrl,
+      content_type: contentType as any,
+      content_text: contentText ?? undefined,
+      media_url: mediaUrl ?? undefined,
       message_id: message.id,
       status: 'delivered',
       created_at: new Date(parseInt(message.timestamp) * 1000).toISOString(),
-      reply_to_message_id: replyToInternalId,
-      interactive_reply_id: interactiveReplyId,
+      reply_to_message_id: replyToInternalId ?? undefined,
+      interactive_reply_id: interactiveReplyId ?? undefined,
     })
   } catch (msgError) {
     console.error('Error inserting message:', msgError)
@@ -557,7 +557,7 @@ async function processMessage(
 
   // Update conversation
   try {
-    await dbService.business.updateConversation(conversation.id, {
+    await conversationRepo.update(conversation.id, {
       last_message_text: contentText || `[${message.type}]`,
       last_message_at: new Date().toISOString(),
       unread_count: (conversation.unread_count || 0) + 1,
@@ -569,7 +569,7 @@ async function processMessage(
   // If this contact was a recent broadcast recipient, flag the reply
   // so the broadcast's `replied_count` advances (via the aggregate
   // trigger installed in migration 003).
-  await flagBroadcastReplyIfAny(userId, contactRecord.id)
+  await flagBroadcastReplyIfAny(organizationId, contactRecord.id)
 
   // ============================================================
   // Flow runner dispatch.
@@ -591,7 +591,7 @@ async function processMessage(
   // basically for free (one indexed SELECT for the active run).
   // ============================================================
   const flowResult = await dispatchInboundToFlows({
-    userId,
+    userId: organizationId,
     contactId: contactRecord.id,
     conversationId: conversation.id,
     message:
@@ -638,7 +638,7 @@ async function processMessage(
   if (isFirstInboundMessage) automationTriggers.unshift('first_inbound_message')
   for (const triggerType of automationTriggers) {
     runAutomationsForTrigger({
-      userId,
+      organizationId,
       triggerType,
       contactId: contactRecord.id,
       context: {
@@ -655,7 +655,7 @@ async function processMessage(
   // ============================================================
   if (!flowConsumed) {
     dispatchAIReply({
-      userId,
+      userId: organizationId,
       contactId: contactRecord.id,
       conversationId: conversation.id,
       inboundText,
@@ -820,12 +820,12 @@ interface ContactOutcome {
 }
 
 async function findOrCreateContact(
-  userId: string,
+  organizationId: string,
   phone: string,
   name: string
 ): Promise<ContactOutcome | null> {
   try {
-    const outcome = await dbService.sync.syncLead(userId, { phone, name })
+    const outcome = await syncRepo.syncLead(organizationId, { phone, name })
     return {
       contact: outcome.contact,
       wasCreated: outcome.wasCreated,
@@ -836,13 +836,13 @@ async function findOrCreateContact(
   }
 }
 
-async function findOrCreateConversation(userId: string, contactId: string) {
+async function findOrCreateConversation(organizationId: string, contactId: string) {
   try {
-    const existing = await dbService.business.findConversationByContact(userId, contactId)
+    const existing = await conversationRepo.findByContact(organizationId, contactId)
     if (existing) {
       return existing
     }
-    return await dbService.business.createConversation(userId, contactId)
+    return await conversationRepo.create({ user_id: organizationId, contact_id: contactId })
   } catch (err) {
     console.error('Error finding/creating conversation:', err)
     return null

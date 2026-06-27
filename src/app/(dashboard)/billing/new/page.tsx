@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import { calculateInvoice } from "@/lib/gst/calculator"
 import { cn } from "@/lib/utils"
 
-interface LineItem { description: string; hsn_sac: string; quantity: number; rate: number; discount_pct: number; tax_rate: number }
+interface LineItem { description: string; hsn_sac: string; quantity: number; rate: number; discount_pct: number; tax_rate: number; unit?: string }
 
 const TAX_SLABS = [0, 5, 12, 18, 28]
 const UNITS = ["NOS", "SQF", "MTR", "KG", "LTR", "HRS", "DAYS", "MONTHS", "PCS", "SET"]

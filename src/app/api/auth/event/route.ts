@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { dbService } from '@/services/db';
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
 import { headers } from 'next/headers';
 
 export async function POST(request: Request) {
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     const userAgent = headerList.get('user-agent') || 'unknown';
 
     // 1. Log the audit event via dbService
-    await dbService.ai.logAuthEvent({
+    await aiDataRepo.logAuthEvent({
       userId: userId || null,
       email,
       eventType: event, // 'login' | 'signup'
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     // 2. If it is a successful login or signup and userId is present, upsert user account info via dbService
     if (status === 'success' && userId) {
-      await dbService.ai.upsertUser(userId, {
+      await aiDataRepo.upsertUser(userId, {
         email,
         fullName: fullName || null,
       });

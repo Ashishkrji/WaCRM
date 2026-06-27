@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { chatWithAgent } from '@/lib/ai/agent-builder'
+import { chatWithAgent } from '@/services/ai/agent-builder'
 
 // POST /api/ai/npc-agents/[id]/chat
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {

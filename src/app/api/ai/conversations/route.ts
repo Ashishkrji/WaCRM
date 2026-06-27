@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { dbService } from '@/services/db'
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
 import { type SupabaseClient } from '@supabase/supabase-js'
 
 async function requireUser(): Promise<
@@ -27,7 +27,7 @@ export async function GET() {
 
   try {
     // Fetch AI conversations from MongoDB Atlas via Database Service Layer
-    const mongoAIConvs = await dbService.ai.listAIConversationsByUser(userId)
+    const mongoAIConvs = await aiDataRepo.listAIConversationsByUser(userId)
 
     if (mongoAIConvs.length === 0) {
       return NextResponse.json([])
@@ -36,7 +36,7 @@ export async function GET() {
     const conversationIds = mongoAIConvs.map(c => c.conversation_id)
 
     // Fetch corresponding details from Supabase to join contacts & last messages
-    const supabaseConvs = await dbService.business.findConversationsByIds(conversationIds, supabase)
+    const supabaseConvs = await conversationRepo.findByIds(conversationIds)
 
     const supabaseMap = new Map<string, any>(
       (supabaseConvs || []).map(c => [c.id, c])

@@ -252,7 +252,7 @@ async function walkNodes(
       case 'decision': {
         const decision = await makeAIDecision({
           context: ctx,
-          nodeConfig: node.config,
+          nodeConfig: node.config as Record<string, unknown>,
           workflowId: workflow.id,
           userId: workflow.user_id,
           executionId,

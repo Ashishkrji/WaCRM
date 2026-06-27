@@ -16,7 +16,7 @@ import type {
 } from '@/types'
 import { supabaseAdmin } from './admin-client'
 import { engineSendText, engineSendTemplate } from './meta-send'
-import { logAutomation } from '@/lib/ai/mongodb-logger'
+import { logAutomation } from '@/services/ai/mongodb-logger'
 
 // ------------------------------------------------------------
 // Public API
@@ -36,7 +36,7 @@ export interface AutomationContext {
 }
 
 export interface DispatchInput {
-  userId: string
+  organizationId: string
   triggerType: AutomationTriggerType
   contactId?: string | null
   context?: AutomationContext
@@ -55,7 +55,7 @@ export async function runAutomationsForTrigger(input: DispatchInput): Promise<vo
     const { data: automations, error } = await db
       .from('automations')
       .select('*')
-      .eq('user_id', input.userId)
+      .eq('user_id', input.organizationId)
       .eq('trigger_type', input.triggerType)
       .eq('is_active', true)
 
@@ -291,7 +291,7 @@ async function executeStepsFrom(args: ExecuteArgs): Promise<void> {
     await appendResults(args.logId, results, status, errorMessage)
     // Log to MongoDB Atlas
     void logAutomation({
-      userId: args.automation.user_id,
+      organizationId: args.automation.user_id,
       automationId: args.automation.id,
       contactId: args.contactId || '',
       triggerType: args.triggerEvent,
@@ -316,7 +316,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       if (!text.trim()) throw new Error('send_message has empty text')
       const conversationId = await resolveConversationId(args)
       const { whatsapp_message_id } = await engineSendText({
-        userId: args.automation.user_id,
+        organizationId: args.automation.user_id,
         conversationId,
         contactId: args.contactId,
         text,
@@ -348,7 +348,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
             .map((k) => String(cfg.variables![k]))
         : []
       const { whatsapp_message_id } = await engineSendTemplate({
-        userId: args.automation.user_id,
+        organizationId: args.automation.user_id,
         conversationId,
         contactId: args.contactId,
         templateName: cfg.template_name,

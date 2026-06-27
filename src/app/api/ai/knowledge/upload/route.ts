@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { type SupabaseClient } from '@supabase/supabase-js'
-import { ingestText } from '@/lib/ai/knowledge/ingest'
-import { dbService } from '@/services/db'
+import { ingestText } from '@/services/knowledge/ingest'
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
 import crypto from 'crypto'
 
 async function requireUser(): Promise<
@@ -136,7 +136,7 @@ export async function POST(request: Request) {
       updated_at: new Date(),
     }
 
-    await dbService.ai.insertKnowledgeDoc(doc)
+    await aiDataRepo.insertKnowledgeDoc(doc)
 
     // 4. Trigger ingestion in the background
     void ingestText({
@@ -156,3 +156,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+

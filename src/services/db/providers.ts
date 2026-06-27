@@ -1,6 +1,6 @@
 import { connectToDatabase } from '@/lib/mongodb'
 import type { Db } from 'mongodb'
-import type { AIAgentConfig } from '@/lib/ai/types'
+import type { AIAgentConfig } from '@/services/ai/types'
 
 // ============================================================
 // 1. Vector Store Provider Abstraction
@@ -9,9 +9,9 @@ export interface VectorStoreProvider {
   readonly name: string;
   insertKnowledgeEmbeddings(rows: any[]): Promise<void>;
   deleteKnowledgeEmbeddings(docId: string): Promise<void>;
-  vectorSearchKnowledge(userId: string, embeddingVector: number[], topK?: number): Promise<any[]>;
+  vectorSearchKnowledge(organizationId: string, embeddingVector: number[], topK?: number): Promise<any[]>;
   hybridSearchKnowledge(
-    userId: string,
+    organizationId: string,
     embeddingVector: number[],
     keywordText: string,
     filters?: { category?: string; tags?: string[] },
@@ -24,8 +24,8 @@ export interface VectorStoreProvider {
 // ============================================================
 export interface MemoryProvider {
   readonly name: string;
-  getContactMemory(userId: string, contactId: string): Promise<any>;
-  updateContactMemory(userId: string, contactId: string, updates: any): Promise<void>;
+  getContactMemory(organizationId: string, contactId: string): Promise<any>;
+  updateContactMemory(organizationId: string, contactId: string, updates: any): Promise<void>;
 }
 
 // ============================================================
@@ -36,7 +36,7 @@ export interface AIDataServiceProvider {
   
   // Webhook, Automation, & Sentiment Logs
   logWebhook(args: {
-    userId: string;
+    organizationId: string;
     direction: 'inbound' | 'outbound';
     payload: any;
     status: string;
@@ -44,7 +44,7 @@ export interface AIDataServiceProvider {
   }): Promise<void>;
   
   logAutomation(args: {
-    userId: string;
+    organizationId: string;
     automationId: string;
     contactId: string;
     triggerType: string;
@@ -54,7 +54,7 @@ export interface AIDataServiceProvider {
   }): Promise<void>;
 
   logPrompt(args: {
-    userId: string;
+    organizationId: string;
     messages: any[];
     systemPrompt?: string | null;
     reply: string;
@@ -65,7 +65,7 @@ export interface AIDataServiceProvider {
   }): Promise<void>;
 
   logSentimentAnalysis(args: {
-    userId: string;
+    organizationId: string;
     contactId: string;
     conversationId: string;
     text: string;
@@ -77,7 +77,7 @@ export interface AIDataServiceProvider {
 
   // AI Usage & cost telemetry logs
   logAIUsage(log: {
-    userId: string;
+    organizationId: string;
     operation: string;
     provider: string;
     model: string;
@@ -86,11 +86,11 @@ export interface AIDataServiceProvider {
     finishReason?: string | null;
   }): Promise<void>;
 
-  listAIUsageLogs(userId: string, limit?: number): Promise<any[]>;
+  listAIUsageLogs(organizationId: string, limit?: number): Promise<any[]>;
 
   // Auth Events and Users sync
   logAuthEvent(args: {
-    userId: string | null;
+    organizationId: string | null;
     email: string;
     eventType: string;
     status: string;
@@ -99,14 +99,14 @@ export interface AIDataServiceProvider {
     errorMessage?: string | null;
   }): Promise<void>;
 
-  upsertUser(userId: string, data: { email: string; fullName?: string | null }): Promise<void>;
+  upsertUser(organizationId: string, data: { email: string; fullName?: string | null }): Promise<void>;
 
   // AI Conversations State
   getAIConversation(conversationId: string): Promise<any>;
   upsertAIConversation(
     conversationId: string,
     updates: {
-      userId: string;
+      organizationId: string;
       totalAiMessages?: number;
       aiActive?: boolean;
       handedOffAt?: Date | null;
@@ -114,14 +114,14 @@ export interface AIDataServiceProvider {
       model?: string;
     }
   ): Promise<void>;
-  listAIConversationsByUser(userId: string): Promise<any[]>;
+  listAIConversationsByUser(organizationId: string): Promise<any[]>;
 
   // Conversation Summaries
   getSummary(conversationId: string): Promise<any>;
   upsertSummary(
     conversationId: string,
     args: {
-      userId: string;
+      organizationId: string;
       summary: string;
       messageCountAtSummary: number;
       provider: string;
@@ -131,10 +131,10 @@ export interface AIDataServiceProvider {
   ): Promise<void>;
 
   // Prompt Templates
-  listPromptTemplates(userId: string): Promise<any[]>;
-  unsetDefaultPromptTemplates(userId: string): Promise<void>;
+  listPromptTemplates(organizationId: string): Promise<any[]>;
+  unsetDefaultPromptTemplates(organizationId: string): Promise<void>;
   upsertPromptTemplate(
-    userId: string,
+    organizationId: string,
     templateId: string,
     data: {
       name: string;
@@ -144,49 +144,49 @@ export interface AIDataServiceProvider {
       intent_filter?: string[];
     }
   ): Promise<void>;
-  deletePromptTemplate(userId: string, templateId: string): Promise<void>;
+  deletePromptTemplate(organizationId: string, templateId: string): Promise<void>;
 
   // Knowledge Base document management
-  listKnowledgeBase(userId: string): Promise<any[]>;
-  getKnowledgeDoc(userId: string, docId: string): Promise<any>;
+  listKnowledgeBase(organizationId: string): Promise<any[]>;
+  getKnowledgeDoc(organizationId: string, docId: string): Promise<any>;
   insertKnowledgeDoc(doc: Record<string, any>): Promise<void>;
   updateKnowledgeDoc(docId: string, updates: Record<string, any>): Promise<void>;
   deleteKnowledgeDoc(docId: string): Promise<void>;
   getKnowledgeDocTitles(kbIds: string[]): Promise<any[]>;
 
   // Knowledge Analytics Logs
-  logKnowledgeSearch(userId: string, query: string, hitCount: number, latencyMs: number, success: boolean): Promise<void>;
-  logKnowledgeUsage(userId: string, docId: string): Promise<void>;
-  getKnowledgeAnalytics(userId: string): Promise<any>;
+  logKnowledgeSearch(organizationId: string, query: string, hitCount: number, latencyMs: number, success: boolean): Promise<void>;
+  logKnowledgeUsage(organizationId: string, docId: string): Promise<void>;
+  getKnowledgeAnalytics(organizationId: string): Promise<any>;
 
   // AI Agent Management
-  listAIAgents(userId: string): Promise<AIAgentConfig[]>;
-  getAIAgent(userId: string, agentId: string): Promise<AIAgentConfig | null>;
-  upsertAIAgent(userId: string, agentId: string, data: Partial<AIAgentConfig>): Promise<void>;
-  deleteAIAgent(userId: string, agentId: string): Promise<void>;
+  listAIAgents(organizationId: string): Promise<AIAgentConfig[]>;
+  getAIAgent(organizationId: string, agentId: string): Promise<AIAgentConfig | null>;
+  upsertAIAgent(organizationId: string, agentId: string, data: Partial<AIAgentConfig>): Promise<void>;
+  deleteAIAgent(organizationId: string, agentId: string): Promise<void>;
 
   // Sales Intelligence MongoDB operations
-  saveLeadAnalysis(contactId: string, userId: string, data: any): Promise<void>;
+  saveLeadAnalysis(contactId: string, organizationId: string, data: any): Promise<void>;
   getLeadAnalysis(contactId: string): Promise<any>;
-  saveSalesPredictions(contactId: string, userId: string, data: any): Promise<void>;
+  saveSalesPredictions(contactId: string, organizationId: string, data: any): Promise<void>;
   getSalesPredictions(contactId: string): Promise<any>;
-  saveAIRecommendations(contactId: string, userId: string, data: any): Promise<void>;
+  saveAIRecommendations(contactId: string, organizationId: string, data: any): Promise<void>;
   getAIRecommendations(contactId: string): Promise<any>;
   
   // Proposals & Quotations Drafts
-  saveProposalDraft(contactId: string, userId: string, data: any): Promise<void>;
+  saveProposalDraft(contactId: string, organizationId: string, data: any): Promise<void>;
   getProposalDraft(contactId: string): Promise<any>;
-  saveQuotationDraft(contactId: string, userId: string, data: any): Promise<void>;
+  saveQuotationDraft(contactId: string, organizationId: string, data: any): Promise<void>;
   getQuotationDraft(contactId: string): Promise<any>;
 
   // Meeting Summaries
-  saveMeetingSummary(meetingId: string, userId: string, summary: any): Promise<void>;
+  saveMeetingSummary(meetingId: string, organizationId: string, summary: any): Promise<void>;
   getMeetingSummary(meetingId: string): Promise<any>;
 
   // Marketing Automation Extensions
-  saveCampaignStrategy(campaignId: string, userId: string, data: any): Promise<void>;
+  saveCampaignStrategy(campaignId: string, organizationId: string, data: any): Promise<void>;
   getCampaignStrategy(campaignId: string): Promise<any>;
-  saveAudienceBehavior(contactId: string, userId: string, data: any): Promise<void>;
+  saveAudienceBehavior(contactId: string, organizationId: string, data: any): Promise<void>;
   saveSocialSync(channel: string, payload: any): Promise<void>;
   saveMarketingPredictions(campaignId: string, predictions: any): Promise<void>;
 }
@@ -212,7 +212,7 @@ export class MongoVectorStoreProvider implements VectorStoreProvider {
     await db.collection('knowledge_embeddings').deleteMany({ knowledge_base_id: docId });
   }
 
-  async vectorSearchKnowledge(userId: string, embeddingVector: number[], topK = 5) {
+  async vectorSearchKnowledge(organizationId: string, embeddingVector: number[], topK = 5) {
     const db = await this.getDb();
     return db
       .collection('knowledge_embeddings')
@@ -224,7 +224,7 @@ export class MongoVectorStoreProvider implements VectorStoreProvider {
             queryVector: embeddingVector,
             numCandidates: 100,
             limit: topK,
-            filter: { user_id: userId },
+            filter: { user_id: organizationId },
           },
         },
         {
@@ -240,7 +240,7 @@ export class MongoVectorStoreProvider implements VectorStoreProvider {
   }
 
   async hybridSearchKnowledge(
-    userId: string,
+    organizationId: string,
     embeddingVector: number[],
     keywordText: string,
     filters: { category?: string; tags?: string[] } = {},
@@ -249,7 +249,7 @@ export class MongoVectorStoreProvider implements VectorStoreProvider {
     const db = await this.getDb();
     
     // 1. Vector Search Stage
-    const vectorFilter: Record<string, any> = { user_id: userId };
+    const vectorFilter: Record<string, any> = { user_id: organizationId };
     if (filters.category) {
       vectorFilter.category = filters.category;
     }
@@ -290,7 +290,7 @@ export class MongoVectorStoreProvider implements VectorStoreProvider {
     }
 
     // 2. Keyword Search Pipeline (Option A: fallback regex match)
-    const keywordFilter: Record<string, any> = { user_id: userId };
+    const keywordFilter: Record<string, any> = { user_id: organizationId };
     if (filters.category) {
       keywordFilter.category = filters.category;
     }
@@ -377,17 +377,17 @@ export class MongoMemoryProvider implements MemoryProvider {
     return db;
   }
 
-  async getContactMemory(userId: string, contactId: string) {
+  async getContactMemory(organizationId: string, contactId: string) {
     const db = await this.getDb();
     const data = await db.collection('ai_memory').findOne({
-      user_id: userId,
+      user_id: organizationId,
       contact_id: contactId,
     });
 
     if (!data) return null;
 
     return {
-      userId: data.user_id,
+      organizationId: data.user_id,
       contactId: data.contact_id,
       facts: data.facts || {},
       lastIntent: data.last_intent || null,
@@ -398,11 +398,11 @@ export class MongoMemoryProvider implements MemoryProvider {
     };
   }
 
-  async updateContactMemory(userId: string, contactId: string, updates: any) {
+  async updateContactMemory(organizationId: string, contactId: string, updates: any) {
     const db = await this.getDb();
 
     const existing = await db.collection('ai_memory').findOne({
-      user_id: userId,
+      user_id: organizationId,
       contact_id: contactId,
     });
 
@@ -413,7 +413,7 @@ export class MongoMemoryProvider implements MemoryProvider {
 
     await db.collection('ai_memory').updateOne(
       {
-        user_id: userId,
+        user_id: organizationId,
         contact_id: contactId,
       },
       {
@@ -449,7 +449,7 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
   async logWebhook(args: any) {
     const db = await this.getDb();
     await db.collection('webhook_logs').insertOne({
-      user_id: args.userId,
+      user_id: args.organizationId,
       direction: args.direction,
       payload: args.payload,
       status: args.status,
@@ -461,7 +461,7 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
   async logAutomation(args: any) {
     const db = await this.getDb();
     await db.collection('automation_logs').insertOne({
-      user_id: args.userId,
+      user_id: args.organizationId,
       automation_id: args.automationId,
       contact_id: args.contactId,
       trigger_type: args.triggerType,
@@ -475,7 +475,7 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
   async logPrompt(args: any) {
     const db = await this.getDb();
     await db.collection('prompt_history').insertOne({
-      user_id: args.userId,
+      user_id: args.organizationId,
       messages: args.messages,
       system_prompt: args.systemPrompt || null,
       reply: args.reply,
@@ -490,7 +490,7 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
   async logSentimentAnalysis(args: any) {
     const db = await this.getDb();
     await db.collection('sentiment_analysis_logs').insertOne({
-      user_id: args.userId,
+      user_id: args.organizationId,
       contact_id: args.contactId,
       conversation_id: args.conversationId,
       text: args.text,
@@ -505,7 +505,7 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
   async logAIUsage(log: any) {
     const db = await this.getDb();
     await db.collection('ai_usage_logs').insertOne({
-      user_id: log.userId,
+      user_id: log.organizationId,
       operation: log.operation,
       provider: log.provider,
       model: log.model,
@@ -516,11 +516,11 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     });
   }
 
-  async listAIUsageLogs(userId: string, limit = 100) {
+  async listAIUsageLogs(organizationId: string, limit = 100) {
     const db = await this.getDb();
     return db
       .collection('ai_usage_logs')
-      .find({ user_id: userId })
+      .find({ user_id: organizationId })
       .sort({ created_at: -1 })
       .limit(limit)
       .toArray();
@@ -529,7 +529,7 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
   async logAuthEvent(args: any) {
     const db = await this.getDb();
     await db.collection('auth_events').insertOne({
-      user_id: args.userId || null,
+      user_id: args.organizationId || null,
       email: args.email,
       event_type: args.eventType,
       status: args.status,
@@ -540,10 +540,10 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     });
   }
 
-  async upsertUser(userId: string, data: any) {
+  async upsertUser(organizationId: string, data: any) {
     const db = await this.getDb();
     const userDoc: Record<string, any> = {
-      id: userId,
+      id: organizationId,
       email: data.email,
       updated_at: new Date(),
     };
@@ -551,7 +551,7 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
       userDoc.full_name = data.fullName;
     }
     await db.collection('users').updateOne(
-      { id: userId },
+      { id: organizationId },
       {
         $set: userDoc,
         $setOnInsert: {
@@ -584,7 +584,7 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
       {
         $set: setFields,
         $setOnInsert: {
-          user_id: updates.userId,
+          user_id: updates.organizationId,
           created_at: new Date(),
         },
       },
@@ -592,11 +592,11 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     );
   }
 
-  async listAIConversationsByUser(userId: string) {
+  async listAIConversationsByUser(organizationId: string) {
     const db = await this.getDb();
     return db
       .collection('ai_conversations')
-      .find({ user_id: userId })
+      .find({ user_id: organizationId })
       .sort({ updated_at: -1 })
       .toArray();
   }
@@ -614,7 +614,7 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
       { conversation_id: conversationId },
       {
         $set: {
-          user_id: args.userId,
+          user_id: args.organizationId,
           summary: args.summary,
           message_count_at_summary: args.messageCountAtSummary,
           provider: args.provider,
@@ -630,27 +630,27 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     );
   }
 
-  async listPromptTemplates(userId: string) {
+  async listPromptTemplates(organizationId: string) {
     const db = await this.getDb();
     return db
       .collection('prompt_templates')
-      .find({ user_id: userId })
+      .find({ user_id: organizationId })
       .sort({ created_at: -1 })
       .toArray();
   }
 
-  async unsetDefaultPromptTemplates(userId: string) {
+  async unsetDefaultPromptTemplates(organizationId: string) {
     const db = await this.getDb();
     await db.collection('prompt_templates').updateMany(
-      { user_id: userId },
+      { user_id: organizationId },
       { $set: { is_default: false, updated_at: new Date() } }
     );
   }
 
-  async upsertPromptTemplate(userId: string, templateId: string, data: any) {
+  async upsertPromptTemplate(organizationId: string, templateId: string, data: any) {
     const db = await this.getDb();
     await db.collection('prompt_templates').updateOne(
-      { id: templateId, user_id: userId },
+      { id: templateId, user_id: organizationId },
       {
         $set: {
           name: data.name,
@@ -662,7 +662,7 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
         },
         $setOnInsert: {
           id: templateId,
-          user_id: userId,
+          user_id: organizationId,
           created_at: new Date(),
         },
       },
@@ -670,26 +670,26 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     );
   }
 
-  async deletePromptTemplate(userId: string, templateId: string) {
+  async deletePromptTemplate(organizationId: string, templateId: string) {
     const db = await this.getDb();
     await db.collection('prompt_templates').deleteOne({
       id: templateId,
-      user_id: userId,
+      user_id: organizationId,
     });
   }
 
-  async listKnowledgeBase(userId: string) {
+  async listKnowledgeBase(organizationId: string) {
     const db = await this.getDb();
     return db
       .collection('knowledge_base')
-      .find({ user_id: userId })
+      .find({ user_id: organizationId })
       .sort({ created_at: -1 })
       .toArray();
   }
 
-  async getKnowledgeDoc(userId: string, docId: string) {
+  async getKnowledgeDoc(organizationId: string, docId: string) {
     const db = await this.getDb();
-    return db.collection('knowledge_base').findOne({ id: docId, user_id: userId });
+    return db.collection('knowledge_base').findOne({ id: docId, user_id: organizationId });
   }
 
   async insertKnowledgeDoc(doc: Record<string, any>) {
@@ -722,10 +722,10 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
       .toArray();
   }
 
-  async logKnowledgeSearch(userId: string, query: string, hitCount: number, latencyMs: number, success: boolean) {
+  async logKnowledgeSearch(organizationId: string, query: string, hitCount: number, latencyMs: number, success: boolean) {
     const db = await this.getDb();
     await db.collection('knowledge_search_logs').insertOne({
-      user_id: userId,
+      user_id: organizationId,
       query,
       hit_count: hitCount,
       latency_ms: latencyMs,
@@ -734,10 +734,10 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     });
   }
 
-  async logKnowledgeUsage(userId: string, docId: string) {
+  async logKnowledgeUsage(organizationId: string, docId: string) {
     const db = await this.getDb();
     await db.collection('knowledge_usage_stats').updateOne(
-      { user_id: userId, knowledge_base_id: docId },
+      { user_id: organizationId, knowledge_base_id: docId },
       {
         $inc: { usage_count: 1 },
         $set: { updated_at: new Date() },
@@ -747,18 +747,18 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     );
   }
 
-  async getKnowledgeAnalytics(userId: string) {
+  async getKnowledgeAnalytics(organizationId: string) {
     const db = await this.getDb();
     const searchLogs = await db
       .collection('knowledge_search_logs')
-      .find({ user_id: userId })
+      .find({ user_id: organizationId })
       .sort({ created_at: -1 })
       .limit(100)
       .toArray();
 
     const usageStats = await db
       .collection('knowledge_usage_stats')
-      .find({ user_id: userId })
+      .find({ user_id: organizationId })
       .sort({ usage_count: -1 })
       .limit(20)
       .toArray();
@@ -769,14 +769,14 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     };
   }
 
-  async listAIAgents(userId: string): Promise<AIAgentConfig[]> {
+  async listAIAgents(organizationId: string): Promise<AIAgentConfig[]> {
     const db = await this.getDb();
     const docs = await db
       .collection('ai_agent_configs')
-      .find({ user_id: userId })
+      .find({ user_id: organizationId })
       .toArray();
     return docs.map(doc => ({
-      userId: doc.user_id,
+      organizationId: doc.user_id,
       agentId: doc.agent_id,
       enabled: doc.enabled,
       name: doc.name,
@@ -791,12 +791,12 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     })) as AIAgentConfig[];
   }
 
-  async getAIAgent(userId: string, agentId: string): Promise<AIAgentConfig | null> {
+  async getAIAgent(organizationId: string, agentId: string): Promise<AIAgentConfig | null> {
     const db = await this.getDb();
-    const doc = await db.collection('ai_agent_configs').findOne({ user_id: userId, agent_id: agentId });
+    const doc = await db.collection('ai_agent_configs').findOne({ user_id: organizationId, agent_id: agentId });
     if (!doc) return null;
     return {
-      userId: doc.user_id,
+      organizationId: doc.user_id,
       agentId: doc.agent_id,
       enabled: doc.enabled,
       name: doc.name,
@@ -811,7 +811,7 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     } as AIAgentConfig;
   }
 
-  async upsertAIAgent(userId: string, agentId: string, data: Partial<AIAgentConfig>) {
+  async upsertAIAgent(organizationId: string, agentId: string, data: Partial<AIAgentConfig>) {
     const db = await this.getDb();
     const updates: Record<string, any> = {
       updated_at: new Date(),
@@ -827,11 +827,11 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     if (data.tools !== undefined) updates.tools = data.tools;
 
     await db.collection('ai_agent_configs').updateOne(
-      { user_id: userId, agent_id: agentId },
+      { user_id: organizationId, agent_id: agentId },
       {
         $set: updates,
         $setOnInsert: {
-          user_id: userId,
+          user_id: organizationId,
           agent_id: agentId,
           created_at: new Date(),
         },
@@ -840,19 +840,19 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     );
   }
 
-  async deleteAIAgent(userId: string, agentId: string) {
+  async deleteAIAgent(organizationId: string, agentId: string) {
     const db = await this.getDb();
-    await db.collection('ai_agent_configs').deleteOne({ user_id: userId, agent_id: agentId });
+    await db.collection('ai_agent_configs').deleteOne({ user_id: organizationId, agent_id: agentId });
   }
 
   // Sales Intelligence MongoDB implementations
-  async saveLeadAnalysis(contactId: string, userId: string, data: any) {
+  async saveLeadAnalysis(contactId: string, organizationId: string, data: any) {
     const db = await this.getDb();
     await db.collection('ai_lead_analysis').updateOne(
       { contact_id: contactId },
       {
         $set: {
-          user_id: userId,
+          user_id: organizationId,
           analysis: data,
           updated_at: new Date(),
         },
@@ -870,13 +870,13 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     return doc ? doc.analysis : null;
   }
 
-  async saveSalesPredictions(contactId: string, userId: string, data: any) {
+  async saveSalesPredictions(contactId: string, organizationId: string, data: any) {
     const db = await this.getDb();
     await db.collection('sales_predictions').updateOne(
       { contact_id: contactId },
       {
         $set: {
-          user_id: userId,
+          user_id: organizationId,
           predictions: data,
           updated_at: new Date(),
         },
@@ -894,13 +894,13 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     return doc ? doc.predictions : null;
   }
 
-  async saveAIRecommendations(contactId: string, userId: string, data: any) {
+  async saveAIRecommendations(contactId: string, organizationId: string, data: any) {
     const db = await this.getDb();
     await db.collection('ai_recommendations').updateOne(
       { contact_id: contactId },
       {
         $set: {
-          user_id: userId,
+          user_id: organizationId,
           recommendations: data,
           updated_at: new Date(),
         },
@@ -918,13 +918,13 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     return doc ? doc.recommendations : null;
   }
 
-  async saveProposalDraft(contactId: string, userId: string, data: any) {
+  async saveProposalDraft(contactId: string, organizationId: string, data: any) {
     const db = await this.getDb();
     await db.collection('proposal_drafts').updateOne(
       { contact_id: contactId },
       {
         $set: {
-          user_id: userId,
+          user_id: organizationId,
           draft: data,
           updated_at: new Date(),
         },
@@ -942,13 +942,13 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     return doc ? doc.draft : null;
   }
 
-  async saveQuotationDraft(contactId: string, userId: string, data: any) {
+  async saveQuotationDraft(contactId: string, organizationId: string, data: any) {
     const db = await this.getDb();
     await db.collection('quotation_drafts').updateOne(
       { contact_id: contactId },
       {
         $set: {
-          user_id: userId,
+          user_id: organizationId,
           draft: data,
           updated_at: new Date(),
         },
@@ -966,13 +966,13 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     return doc ? doc.draft : null;
   }
 
-  async saveMeetingSummary(meetingId: string, userId: string, summary: any) {
+  async saveMeetingSummary(meetingId: string, organizationId: string, summary: any) {
     const db = await this.getDb();
     await db.collection('meeting_summaries').updateOne(
       { meeting_id: meetingId },
       {
         $set: {
-          user_id: userId,
+          user_id: organizationId,
           summary: summary,
           updated_at: new Date(),
         },
@@ -991,13 +991,13 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
   }
 
   // Marketing Automation Extensions
-  async saveCampaignStrategy(campaignId: string, userId: string, data: any) {
+  async saveCampaignStrategy(campaignId: string, organizationId: string, data: any) {
     const db = await this.getDb();
     await db.collection('campaign_strategies').updateOne(
       { campaign_id: campaignId },
       {
         $set: {
-          user_id: userId,
+          user_id: organizationId,
           strategy: data,
           updated_at: new Date(),
         },
@@ -1015,13 +1015,13 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     return doc ? doc.strategy : null;
   }
 
-  async saveAudienceBehavior(contactId: string, userId: string, data: any) {
+  async saveAudienceBehavior(contactId: string, organizationId: string, data: any) {
     const db = await this.getDb();
     await db.collection('audience_behavior').updateOne(
       { contact_id: contactId },
       {
         $set: {
-          user_id: userId,
+          user_id: organizationId,
           behavior: data,
           updated_at: new Date(),
         },

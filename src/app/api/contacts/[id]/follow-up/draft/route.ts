@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { dbService } from '@/services/db';
-import { tryGetAIProvider } from '@/lib/ai/provider-factory';
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
+import { tryGetAIProvider } from '@/services/ai/orchestrator';
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
   const {
@@ -17,7 +17,7 @@ export async function POST(
   }
 
   const userId = user.id;
-  const contactId = params.id;
+  const { id: contactId } = await params;
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -52,7 +52,7 @@ export async function POST(
 
     const [recentMessages, activeDeals] = await Promise.all([
       conversation
-        ? dbService.business.getRecentMessages(conversation.id, 10, supabase).catch(() => [])
+        ? messageRepo.getRecentMessages(conversation.id, 10).catch(() => [])
         : Promise.resolve([]),
       supabase
         .from('deals')
@@ -72,7 +72,7 @@ export async function POST(
     // 3. Draft the follow-up message using NVIDIA AI
     let draftedMessage = `Hi ${contact.name || 'there'},\n\nJust following up to see if you had a chance to review our previous message. Let us know if you have any questions!\n\nBest regards,\nMaaJanki Web Tech`;
 
-    const routerConfig = await dbService.business.getAIRouterConfig(userId, supabase);
+    const routerConfig = await aiRouterRepo.getByUserId(userId);
     const activeProviderName = routerConfig?.ai_provider || 'nvidia';
     const provider = tryGetAIProvider(activeProviderName);
 

@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { dbService } from '@/services/db';
-import { tryGetAIProvider } from '@/lib/ai/provider-factory';
-import { searchKnowledge, formatKnowledgeForPrompt } from '@/lib/ai/knowledge/embeddings';
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
+import { tryGetAIProvider } from '@/services/ai/orchestrator';
+import { searchKnowledge, formatKnowledgeForPrompt } from '@/services/knowledge/embeddings';
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const resolvedParams = await params;
+  const contactId = resolvedParams.id;
   const supabase = await createClient();
   const {
     data: { user },
@@ -18,7 +20,6 @@ export async function POST(
   }
 
   const userId = user.id;
-  const contactId = params.id;
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -49,7 +50,7 @@ export async function POST(
 
     const [recentMessages, contactNotes, activeDeals] = await Promise.all([
       conversation
-        ? dbService.business.getRecentMessages(conversation.id, 15, supabase).catch(() => [])
+        ? messageRepo.getRecentMessages(conversation.id, 15).catch(() => [])
         : Promise.resolve([]),
       supabase
         .from('contact_notes')
@@ -108,7 +109,7 @@ export async function POST(
       paymentTerms: '50% advance to initiate project, 50% upon deployment/handover.',
     };
 
-    const routerConfig = await dbService.business.getAIRouterConfig(userId, supabase);
+    const routerConfig = await aiRouterRepo.getByUserId(userId);
     const activeProviderName = routerConfig?.ai_provider || 'nvidia';
     const provider = tryGetAIProvider(activeProviderName);
 
@@ -196,7 +197,7 @@ Compile the quotation and return EXACTLY this JSON structure:
 
     // 5. Save draft in MongoDB Atlas
     try {
-      await dbService.ai.saveQuotationDraft(contactId, userId, quotationData);
+      await aiDataRepo.saveQuotationDraft(contactId, userId, quotationData);
     } catch (mongoErr) {
       console.error('[Quotations API] MongoDB save failed:', mongoErr);
     }
@@ -222,7 +223,7 @@ Compile the quotation and return EXACTLY this JSON structure:
 
     // 7. Update AI memory of this quotation request
     try {
-      await dbService.ai.updateContactMemory(userId, contactId, {
+      await memoryRepo.updateContactMemory(userId, contactId, {
         facts: {
           last_quotation_amount: String(quotationData.totalAmount),
           quotation_generated_at: new Date().toISOString(),

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { scoreContact, getTopLeads, recordSignal } from '@/lib/leads/scoring-engine'
+import { scoreContact, getTopLeads, recordSignal } from '@/services/sales/scoring-engine'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 
 export async function GET(request: Request) {

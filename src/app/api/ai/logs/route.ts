@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { dbService } from '@/services/db'
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
 import { type SupabaseClient } from '@supabase/supabase-js'
 
 async function requireUser(): Promise<
@@ -25,7 +25,7 @@ export async function GET() {
 
   try {
     // Fetch logs from MongoDB Atlas using the Database Service Layer
-    const logs = await dbService.ai.listAIUsageLogs(guard.userId)
+    const logs = await aiDataRepo.listAIUsageLogs(guard.userId)
 
     const formatted = logs.map(l => ({
       id: l._id.toString(),

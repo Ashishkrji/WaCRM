@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
-import { createAgent } from '@/lib/ai/agent-builder'
+import { createAgent } from '@/services/ai/agent-builder'
 
 // GET /api/ai/npc-agents
 export async function GET() {

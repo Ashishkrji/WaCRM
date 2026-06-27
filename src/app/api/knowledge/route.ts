@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
-import { searchKnowledgeBase, indexArticle, logSearch } from '@/lib/knowledge/vector-search'
+import { searchKnowledgeBase, indexArticle, logSearch } from '@/services/knowledge/vector-search'
 
 // GET /api/knowledge?q=&category=&page=
 export async function GET(request: Request) {

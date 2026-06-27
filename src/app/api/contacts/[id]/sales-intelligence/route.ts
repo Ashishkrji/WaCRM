@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { dbService } from '@/services/db';
-import { tryGetAIProvider } from '@/lib/ai/provider-factory';
+import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quotationRepo, proposalRepo, pipelineRepo, leadScoreRepo, syncRepo, aiRouterRepo, knowledgeRepo, memoryRepo, aiDataRepo } from '@/repositories';
+import { tryGetAIProvider } from '@/services/ai/orchestrator';
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const resolvedParams = await params;
+  const contactId = resolvedParams.id;
   const supabase = await createClient();
   const {
     data: { user },
@@ -17,7 +19,6 @@ export async function GET(
   }
 
   const userId = user.id;
-  const contactId = params.id;
 
   try {
     // 1. Fetch Contact Details to verify ownership
@@ -45,7 +46,7 @@ export async function GET(
 
     const [recentMessages, contactNotes, activeDeals] = await Promise.all([
       conversation
-        ? dbService.business.getRecentMessages(conversation.id, 25, supabase).catch(() => [])
+        ? messageRepo.getRecentMessages(conversation.id, 25).catch(() => [])
         : Promise.resolve([]),
       supabase
         .from('contact_notes')
@@ -117,7 +118,7 @@ export async function GET(
     };
 
     // 4. Call NVIDIA AI to perform deep sales intelligence scoring
-    const routerConfig = await dbService.business.getAIRouterConfig(userId, supabase);
+    const routerConfig = await aiRouterRepo.getByUserId(userId);
     const activeProviderName = routerConfig?.ai_provider || 'nvidia';
     const provider = tryGetAIProvider(activeProviderName);
 
@@ -216,15 +217,15 @@ Generate a comprehensive sales intelligence report. Return EXACTLY this JSON str
     // 5. Save Analysis in MongoDB Atlas Collections (Parallel)
     try {
       await Promise.all([
-        dbService.ai.saveLeadAnalysis(contactId, userId, leadAnalysis.qualification),
-        dbService.ai.saveSalesPredictions(contactId, userId, {
+        aiDataRepo.saveLeadAnalysis(contactId, userId, leadAnalysis.qualification),
+        aiDataRepo.saveSalesPredictions(contactId, userId, {
           clv: leadAnalysis.clv,
           leadScore: leadAnalysis.leadScore,
           leadCategory: leadAnalysis.leadCategory,
           buyingIntent: leadAnalysis.buyingIntent,
           salesInsights: leadAnalysis.salesInsights,
         }),
-        dbService.ai.saveAIRecommendations(contactId, userId, {
+        aiDataRepo.saveAIRecommendations(contactId, userId, {
           recommendations: leadAnalysis.recommendations,
           followUpStrategy: leadAnalysis.followUpStrategy,
         }),
