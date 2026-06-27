@@ -22,10 +22,16 @@ graph TD
     B -->|Live Realtime Sync| C(Multi-Agent Shared Inbox)
     B -->|Fallback Redundancy| D[Supabase Cloud Database]
     B -->|Automatic Offline Bypass| E[Local Browser Cache / localStorage]
-    C --> F[AI Chatbot & Router API]
+    C --> F[NVIDIA AI / Custom LLM Chatbot]
     C --> G[Website Chat Widget Builder]
     C --> H[Sales Kanban Pipelines]
     C --> I[Contact & Tag Segmentation]
+    C --> J[Marketing Automation Engine]
+
+### 🚀 Enterprise AI & Architecture Upgrades
+*   **Repository Pattern (Phase 1)**: Unified architecture merging Supabase (PostgreSQL) and MongoDB Atlas (Vector DB/NoSQL) with clean data abstractions (`knowledgeRepo`, `aiDataRepo`, etc.).
+*   **NVIDIA AI Integrations**: Support for state-of-the-art NVIDIA LLMs, semantic routing, lead scoring, conversation summarization, and automated strategy drafting.
+*   **Marketing Automation Engine**: Complete Omnichannel engagement! Audience segmentation, email campaigns, broadcast scheduling, dynamic workflows, referral tracking, and comprehensive UTM metrics.
 ```
 
 ### 👥 1. Team & Agent Management (100% Direct UI CRUD)
