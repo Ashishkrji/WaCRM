@@ -27,8 +27,10 @@ interface ConversationListProps {
 const STATUS_COLORS: Record<ConversationStatus, string> = {
   open: "bg-primary",
   pending: "bg-amber-500",
-  closed: "bg-slate-500",
+  closed: "bg-muted-foreground",
 };
+
+type InboxFilter = ConversationStatus | "all" | "unread";
 
 const STATUS_FILTER_OPTIONS: { label: string; value: ConversationStatus | "all" }[] = [
   { label: "All Statuses", value: "all" },
@@ -52,14 +54,13 @@ export function ConversationList({
 }: ConversationListProps) {
   const { user } = useAuth();
   const [search, setSearch] = useState("");
-  
   // Smart filter states
   const [inboxTab, setInboxTab] = useState<'shared' | 'private' | 'assigned' | 'unassigned' | 'pinned' | 'favorites' | 'unread' | 'spam' | 'blocked' | 'archived' | 'mentioned' | 'resolved' | 'pending' | 'follow_up' | 'recently_active'>('shared');
   const [statusFilter, setStatusFilter] = useState<ConversationStatus | "all">("all");
   const [assigneeFilter, setAssigneeFilter] = useState<"all" | "unassigned" | "me" | string>("all");
   const [aiFilter, setAiFilter] = useState<"all" | "active" | "inactive">("all");
   const [tagFilter, setTagFilter] = useState<string | "all">("all");
-
+  const [filter, setFilter] = useState<InboxFilter>("all");
   const [loading, setLoading] = useState(true);
 
   // Parallel data states
@@ -259,9 +260,9 @@ export function ConversationList({
   ] as const;
 
   return (
-    <div className="flex h-full w-full flex-col border-r border-slate-800 bg-slate-900 lg:w-80">
+    <div className="flex h-full w-full flex-col border-r border-border bg-card lg:w-80">
       {/* Horizontal Tabs */}
-      <div className="flex overflow-x-auto gap-1 border-b border-slate-800 bg-slate-950/20 px-2 py-1.5 select-none shrink-0 scrollbar-none">
+      <div className="flex overflow-x-auto gap-1 border-b border-border bg-muted/20 px-2 py-1.5 select-none shrink-0 scrollbar-none">
         {INBOX_TABS.map((tab) => {
           const isActive = inboxTab === tab.value;
           return (
@@ -270,10 +271,10 @@ export function ConversationList({
               type="button"
               onClick={() => setInboxTab(tab.value)}
               className={cn(
-                "h-7 shrink-0 px-2.5 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all hover:bg-slate-800 hover:text-white",
+                "h-7 shrink-0 px-2.5 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all hover:bg-muted hover:text-foreground",
                 isActive
-                  ? "bg-slate-800 text-white shadow-sm ring-1 ring-slate-700"
-                  : "text-slate-400"
+                  ? "bg-muted text-foreground shadow-sm ring-1 ring-border"
+                  : "text-muted-foreground"
               )}
             >
               {tab.label}
@@ -283,14 +284,14 @@ export function ConversationList({
       </div>
 
       {/* Search + Smart Filters */}
-      <div className="space-y-2 border-b border-slate-800 p-3">
+      <div className="space-y-2 border-b border-border p-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={handleSearchChange}
             placeholder="Search inbox..."
-            className="border-slate-700 bg-slate-800 pl-9 text-sm text-white placeholder-slate-500 focus:border-primary/50"
+            className="pl-9 text-sm focus:border-primary/50"
           />
         </div>
 
@@ -382,15 +383,20 @@ export function ConversationList({
         </div>
       </div>
 
-      {/* Conversation Items */}
-      <ScrollArea className="flex-1">
+      {/* Conversation Items.
+          `min-h-0` is load-bearing: a flex child defaults to
+          min-height:auto, so without it this ScrollArea grows to fit
+          every conversation instead of shrinking to the remaining
+          space — the list then overflows and gets clipped by the
+          parent's overflow-hidden with no scrollbar (issue #229). */}
+      <ScrollArea className="min-h-0 flex-1">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="px-4 py-12 text-center">
-            <p className="text-sm text-slate-500">No conversations found</p>
+            <p className="text-sm text-muted-foreground">No conversations found</p>
           </div>
         ) : (
           <div className="flex flex-col">
@@ -490,12 +496,12 @@ function ConversationItem({
     <button
       onClick={handleClick}
       className={cn(
-        "flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-slate-800/50",
-        isActive && "border-l-2 border-primary bg-slate-800/70"
+        "flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
+        isActive && "border-l-2 border-primary bg-muted/70"
       )}
     >
       {/* Avatar */}
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-700 text-sm font-medium text-white relative">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground relative">
         {contact?.avatar_url ? (
           <img
             src={contact.avatar_url}
@@ -514,15 +520,15 @@ function ConversationItem({
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-medium text-white flex items-center gap-1">
+          <span className="truncate text-sm font-medium text-foreground flex items-center gap-1">
             {displayName}
             {conversation.pinned && <Pin className="h-3 w-3 text-primary fill-primary rotate-45 shrink-0" />}
             {conversation.favorite && <Star className="h-3 w-3 text-amber-400 fill-amber-400 shrink-0" />}
           </span>
-          <span className="shrink-0 text-[10px] text-slate-500">{timeAgo}</span>
+          <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo}</span>
         </div>
         <div className="mt-0.5 flex items-center justify-between gap-2">
-          <p className="truncate text-xs text-slate-400">
+          <p className="truncate text-xs text-muted-foreground">
             {conversation.last_message_text || "No messages yet"}
           </p>
           <div className="flex shrink-0 items-center gap-1.5">

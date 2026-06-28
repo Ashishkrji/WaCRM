@@ -33,7 +33,7 @@ export const TRIGGER_META: Record<AutomationTriggerType, TriggerMeta> = {
   },
   time_based: {
     label: 'Time-Based',
-    pillClass: 'border-slate-500/30 bg-slate-500/10 text-slate-300',
+    pillClass: 'border-slate-500/30 bg-slate-500/10 text-muted-foreground',
   },
 }
 
@@ -41,7 +41,7 @@ export function triggerMeta(t: AutomationTriggerType | string): TriggerMeta {
   return (
     TRIGGER_META[t as AutomationTriggerType] ?? {
       label: t,
-      pillClass: 'border-slate-500/30 bg-slate-500/10 text-slate-300',
+      pillClass: 'border-slate-500/30 bg-slate-500/10 text-muted-foreground',
     }
   )
 }

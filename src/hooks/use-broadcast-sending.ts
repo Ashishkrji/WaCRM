@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
 import { Contact, MessageTemplate } from '@/types';
 
 export type CustomFieldOperator = 'is' | 'is_not' | 'contains';
@@ -38,6 +39,13 @@ interface BroadcastPayload {
   template: MessageTemplate;
   audience: AudienceConfig;
   variables: Record<string, VariableMapping>;
+  /**
+   * Media URL for an IMAGE/VIDEO/DOCUMENT header. Required at send
+   * time for media-header templates — Meta rejects the send without
+   * it. Passed through as `messageParams.headerMediaUrl`; the builder
+   * falls back to the template's stored URL only when this is empty.
+   */
+  headerMediaUrl?: string;
 }
 
 interface UseBroadcastSendingReturn {
@@ -140,6 +148,7 @@ async function fetchCustomValueIndex(
 }
 
 export function useBroadcastSending(): UseBroadcastSendingReturn {
+  const { accountId } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -220,6 +229,9 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
     if (!user) {
       throw new Error('You are not signed in.');
     }
+    if (!accountId) {
+      throw new Error('Your profile is not linked to an account.');
+    }
 
     // De-duplicate by phone within the CSV (users can paste duplicates).
     const uniqueByPhone = new Map<string, { phone: string; name?: string }>();
@@ -249,6 +261,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       .filter((p) => !byPhone.has(p))
       .map((phone) => ({
         user_id: user.id,
+        account_id: accountId,
         phone,
         name: uniqueByPhone.get(phone)?.name ?? null,
       }));
@@ -326,6 +339,9 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       if (!user) {
         throw new Error('You are not signed in.');
       }
+      if (!accountId) {
+        throw new Error('Your profile is not linked to an account.');
+      }
 
       // ── Step 1: Resolve audience contacts ─────────────────────────
       setProgress(5);
@@ -341,6 +357,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         .from('broadcasts')
         .insert({
           user_id: user.id,
+          account_id: accountId,
           name: payload.name,
           template_name: payload.template.name,
           template_language: payload.template.language ?? 'en_US',
@@ -424,6 +441,19 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       let failedCount = 0;
       const totalRecipients = recipients.length;
 
+      // Media-header templates (image/video/document) require a media
+      // URL on every send. Collected in the personalize step and applied
+      // to all recipients; falls back to the template's stored URL on the
+      // server when omitted.
+      const headerType = payload.template.header_type;
+      const isMediaHeader =
+        headerType === 'image' ||
+        headerType === 'video' ||
+        headerType === 'document';
+      const headerMediaUrl = payload.headerMediaUrl?.trim();
+      const messageParams =
+        isMediaHeader && headerMediaUrl ? { headerMediaUrl } : undefined;
+
       for (let i = 0; i < recipients.length; i += SEND_BATCH_SIZE) {
         const batch = recipients.slice(i, i + SEND_BATCH_SIZE);
 
@@ -438,6 +468,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
                   customValueIndex.get(r.contact.id),
                 )
               : [],
+            ...(messageParams ? { messageParams } : {}),
           }));
 
         if (apiRecipients.length === 0) continue;

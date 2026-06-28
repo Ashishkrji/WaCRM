@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MessageSquare, BarChart3, Calendar, Mail, Eye, EyeOff, Sparkles } from "lucide-react";
+import { MessageSquare, BarChart3, Calendar, Mail, Eye, EyeOff } from "lucide-react";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -17,6 +17,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("invite");
   const supabase = createClient();
 
   useEffect(() => {
@@ -54,7 +55,11 @@ function LoginForm() {
       return;
     }
 
-    router.push("/dashboard");
+    if (inviteToken) {
+      router.push(`/join/${encodeURIComponent(inviteToken)}`);
+    } else {
+      router.push("/dashboard");
+    }
   };
 
   return (
@@ -175,7 +180,7 @@ function LoginForm() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-550 hover:text-slate-400 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 transition-colors"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -204,7 +209,11 @@ function LoginForm() {
               <p className="text-center text-xs text-slate-500">
                 Don&apos;t have an account?{" "}
                 <Link
-                  href="/signup"
+                  href={
+                    inviteToken
+                      ? `/signup?invite=${encodeURIComponent(inviteToken)}`
+                      : "/signup"
+                  }
                   className="font-bold text-blue-500 hover:text-blue-400 transition-colors"
                 >
                   Sign up

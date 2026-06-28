@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { FlowBuilder } from "@/components/flows/flow-builder";
+import { FlowEditorShell } from "@/components/flows/flow-editor-shell";
 import type { FlowRow, FlowNodeRow } from "@/lib/flows/types";
 
 /**
@@ -65,14 +65,14 @@ export default function FlowEditorPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
   if (notFound || !flow) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3">
-        <p className="text-sm text-slate-400">Flow not found.</p>
+        <p className="text-sm text-muted-foreground">Flow not found.</p>
         <button
           type="button"
           onClick={() => router.push("/flows")}
@@ -84,5 +84,5 @@ export default function FlowEditorPage() {
     );
   }
 
-  return <FlowBuilder initialFlow={flow} initialNodes={nodes} />;
+  return <FlowEditorShell initialFlow={flow} initialNodes={nodes} />;
 }

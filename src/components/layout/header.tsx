@@ -18,11 +18,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { GlobalSearchModal } from "./global-search-modal";
 import { cn } from "@/lib/utils";
+import { ModeToggle } from "@/components/layout/mode-toggle";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -242,19 +242,18 @@ export function Header({ onOpenSidebar }: HeaderProps) {
   };
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-800 bg-slate-950 px-4 lg:px-6">
-      <div className="flex min-w-0 items-center gap-3">
-        {/* Hamburger — mobile only */}
+    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-4 lg:px-6">
+      <div className="flex min-w-0 items-center gap-2">
+        {/* Hamburger — mobile only. 44×44 hit target per Apple HIG. */}
         <button
           type="button"
           onClick={onOpenSidebar}
           aria-label="Open menu"
-          className="flex h-10 w-10 items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-800 hover:text-white lg:hidden"
+          className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
         >
           <Menu className="h-5 w-5" />
         </button>
-        
-        <h1 className="hidden sm:block truncate text-base font-semibold text-white sm:text-lg mr-2">
+        <h1 className="hidden sm:block truncate text-base font-semibold text-foreground sm:text-lg mr-2">
           {title}
         </h1>
 
@@ -316,6 +315,9 @@ export function Header({ onOpenSidebar }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Mode Toggle (Theme) */}
+        <ModeToggle />
+
         {/* Spotlight Search Trigger */}
         <button
           type="button"
@@ -509,4 +511,3 @@ export function Header({ onOpenSidebar }: HeaderProps) {
     </header>
   );
 }
-

@@ -1,6 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -37,10 +43,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type {
+  AccountMember,
   AutomationStepType,
   AutomationTriggerType,
+  CustomField,
   KeywordMatchTriggerConfig,
+  MessageTemplate,
+  Tag as TagRecord,
 } from "@/types"
+import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
 // ------------------------------------------------------------
@@ -84,7 +95,7 @@ const STEP_META: Record<AutomationStepType, StepMeta> = {
   assign_conversation: { label: "Assign Conversation", icon: UserCheck, border: "border-l-primary" },
   update_contact_field: { label: "Update Contact Field", icon: PencilLine, border: "border-l-primary" },
   create_deal: { label: "Create Deal", icon: Briefcase, border: "border-l-primary" },
-  wait: { label: "Wait", icon: Hourglass, border: "border-l-slate-500" },
+  wait: { label: "Wait", icon: Hourglass, border: "border-l-border" },
   condition: { label: "Condition (If/Else)", icon: GitBranch, border: "border-l-amber-500" },
   send_webhook: { label: "Send Webhook", icon: Webhook, border: "border-l-primary" },
   close_conversation: { label: "Close Conversation", icon: CircleSlash, border: "border-l-primary" },
@@ -153,6 +164,298 @@ function blankConfig(type: AutomationStepType): Record<string, unknown> {
     default:
       return {}
   }
+}
+
+// ------------------------------------------------------------
+// Account resources (tags, members, approved templates)
+//
+// Loaded once at the builder root and shared via context so the
+// tag / agent / template pickers below can offer existing resources
+// by name instead of asking the user to paste raw UUIDs. Every picker
+// falls back to a raw input when its list is empty (fresh account or
+// an older deployment), so an automation is always authorable.
+// ------------------------------------------------------------
+
+interface AutomationResources {
+  tags: TagRecord[]
+  members: AccountMember[]
+  templates: MessageTemplate[]
+  customFields: CustomField[]
+}
+
+const ResourcesContext = createContext<AutomationResources>({
+  tags: [],
+  members: [],
+  templates: [],
+  customFields: [],
+})
+
+function useResources(): AutomationResources {
+  return useContext(ResourcesContext)
+}
+
+function ResourcesProvider({ children }: { children: ReactNode }) {
+  const [tags, setTags] = useState<TagRecord[]>([])
+  const [members, setMembers] = useState<AccountMember[]>([])
+  const [templates, setTemplates] = useState<MessageTemplate[]>([])
+  const [customFields, setCustomFields] = useState<CustomField[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    const supabase = createClient()
+
+    // Tags, templates and custom fields come straight from the DB — RLS
+    // scopes them to the caller's account. Only APPROVED templates can
+    // actually be sent (anything else 400s at send time), matching the
+    // broadcast picker.
+    void (async () => {
+      const [tagsRes, templatesRes, customFieldsRes] = await Promise.all([
+        supabase.from("tags").select("*").order("name"),
+        supabase
+          .from("message_templates")
+          .select("*")
+          .eq("status", "APPROVED")
+          .order("name"),
+        supabase.from("custom_fields").select("*").order("field_name"),
+      ])
+      if (cancelled) return
+      setTags((tagsRes.data as TagRecord[] | null) ?? [])
+      setTemplates((templatesRes.data as MessageTemplate[] | null) ?? [])
+      setCustomFields((customFieldsRes.data as CustomField[] | null) ?? [])
+    })()
+
+    // Members go through the API so we inherit its email-visibility
+    // rules (agents/viewers don't see emails). Unreachable on older
+    // deployments → pickers fall back to a raw agent-id input.
+    void (async () => {
+      try {
+        const res = await fetch("/api/account/members", { cache: "no-store" })
+        if (!res.ok) return
+        const json = (await res.json()) as { members?: AccountMember[] }
+        if (!cancelled) setMembers(json.members ?? [])
+      } catch {
+        // Members endpoint absent — caller falls back to raw input.
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return (
+    <ResourcesContext.Provider value={{ tags, members, templates, customFields }}>
+      {children}
+    </ResourcesContext.Provider>
+  )
+}
+
+const SELECT_CLASS =
+  "w-full rounded-md border border-border bg-muted px-2 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none"
+
+/** Tag dropdown by name + color, storing the tag's id. Falls back to a
+ *  raw id input when no tags exist yet. */
+function TagSelect({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (v: string) => void
+}) {
+  const { tags } = useResources()
+  if (tags.length === 0) {
+    return (
+      <Input
+        placeholder="Tag id"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-muted text-foreground"
+      />
+    )
+  }
+  const selected = tags.find((t) => t.id === value)
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className="h-3 w-3 shrink-0 rounded-full border border-border"
+        style={{ backgroundColor: selected?.color ?? "transparent" }}
+        aria-hidden
+      />
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={SELECT_CLASS}
+      >
+        <option value="">Select a tag…</option>
+        {tags.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+        {/* Preserve a saved tag that's since been deleted so editing an
+            existing automation doesn't silently drop it. */}
+        {value && !selected && (
+          <option value={value}>{value} (unknown tag)</option>
+        )}
+      </select>
+    </div>
+  )
+}
+
+/** Contact-field dropdown for "Update Contact Field": built-in columns plus
+ *  any account custom fields (stored as `custom:<id>`). A saved custom field
+ *  that's since been deleted is preserved as a labelled option so editing an
+ *  existing automation doesn't silently drop it. */
+function ContactFieldSelect({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (v: string) => void
+}) {
+  const { customFields } = useResources()
+  const customValue = value.startsWith("custom:") ? value : ""
+  const knownCustom =
+    customValue && customFields.some((f) => `custom:${f.id}` === customValue)
+  return (
+    <select
+      value={value || "name"}
+      onChange={(e) => onChange(e.target.value)}
+      className={SELECT_CLASS}
+    >
+      <option value="name">Name</option>
+      <option value="email">Email</option>
+      <option value="company">Company</option>
+      {customFields.length > 0 && (
+        <optgroup label="Custom fields">
+          {customFields.map((f) => (
+            <option key={f.id} value={`custom:${f.id}`}>
+              {f.field_name}
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {customValue && !knownCustom && (
+        <option value={customValue}>{customValue} (unknown field)</option>
+      )}
+    </select>
+  )
+}
+
+/** Agent dropdown by name, storing the member's user_id. Falls back to
+ *  a raw id input when the member list is unavailable. */
+function AgentSelect({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (v: string) => void
+}) {
+  const { members } = useResources()
+  if (members.length === 0) {
+    return (
+      <Input
+        placeholder="Agent id"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-muted text-foreground"
+      />
+    )
+  }
+  const selected = members.find((m) => m.user_id === value)
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={SELECT_CLASS}
+    >
+      <option value="">Select an agent…</option>
+      {members.map((m) => (
+        <option key={m.user_id} value={m.user_id}>
+          {m.full_name || m.email || m.user_id}
+        </option>
+      ))}
+      {value && !selected && (
+        <option value={value}>{value} (unknown agent)</option>
+      )}
+    </select>
+  )
+}
+
+/** Template dropdown showing approved templates by name + language,
+ *  storing both template_name and language. Falls back to manual name +
+ *  language inputs when no approved templates are synced yet. */
+function SendTemplateFields({
+  templateName,
+  language,
+  onChange,
+}: {
+  templateName: string
+  language: string
+  onChange: (patch: { template_name: string; language: string }) => void
+}) {
+  const { templates } = useResources()
+
+  if (templates.length === 0) {
+    return (
+      <>
+        <FieldBlock label="Template name">
+          <Input
+            value={templateName}
+            onChange={(e) =>
+              onChange({ template_name: e.target.value, language })
+            }
+            className="bg-muted text-foreground"
+          />
+        </FieldBlock>
+        <FieldBlock label="Language">
+          <Input
+            value={language}
+            onChange={(e) =>
+              onChange({ template_name: templateName, language: e.target.value })
+            }
+            className="bg-muted text-foreground"
+          />
+        </FieldBlock>
+      </>
+    )
+  }
+
+  // Encode name + language in the option value so two templates that
+  // share a name across languages stay distinct.
+  const toValue = (name: string, lang: string) => `${name}::${lang}`
+  const current = templateName ? toValue(templateName, language) : ""
+  const hasMatch = templates.some(
+    (t) => toValue(t.name, t.language ?? "en_US") === current,
+  )
+
+  return (
+    <FieldBlock label="Template">
+      <select
+        value={current}
+        onChange={(e) => {
+          const [name, lang] = e.target.value.split("::")
+          onChange({ template_name: name ?? "", language: lang ?? "" })
+        }}
+        className={SELECT_CLASS}
+      >
+        <option value="">Select a template…</option>
+        {templates.map((t) => {
+          const lang = t.language ?? "en_US"
+          return (
+            <option key={t.id} value={toValue(t.name, lang)}>
+              {t.name} ({lang})
+            </option>
+          )
+        })}
+        {current && !hasMatch && (
+          <option value={current}>
+            {templateName} ({language || "unknown"}) — not in approved list
+          </option>
+        )}
+      </select>
+    </FieldBlock>
+  )
 }
 
 // ------------------------------------------------------------
@@ -245,15 +548,15 @@ export function AutomationBuilder({ initial }: { initial: BuilderInitial }) {
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-slate-950">
+    <div className="fixed inset-0 flex flex-col bg-background">
       {/* Top bar. At sub-sm widths the "Active" label is hidden and the
           switch moves to the right of the save button, so the name input
           gets maximum width. */}
-      <header className="flex flex-shrink-0 items-center gap-2 border-b border-slate-800 bg-slate-900/80 px-3 py-3 sm:gap-3 sm:px-4">
+      <header className="flex flex-shrink-0 items-center gap-2 border-b border-border bg-card/80 px-3 py-3 sm:gap-3 sm:px-4">
         <button
           type="button"
           onClick={() => router.push("/automations")}
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           aria-label="Back to automations"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -262,9 +565,9 @@ export function AutomationBuilder({ initial }: { initial: BuilderInitial }) {
           value={state.name}
           onChange={(e) => patchTop("name", e.target.value)}
           placeholder="Untitled automation"
-          className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-1 text-sm font-semibold text-white placeholder:text-slate-500 focus:bg-slate-800 focus:outline-none sm:text-base"
+          className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-1 text-sm font-semibold text-foreground placeholder:text-muted-foreground focus:bg-muted focus:outline-none sm:text-base"
         />
-        <div className="flex items-center gap-2 text-xs text-slate-400">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className="hidden sm:inline">Active</span>
           <Switch
             checked={state.is_active}
@@ -284,24 +587,26 @@ export function AutomationBuilder({ initial }: { initial: BuilderInitial }) {
 
       {/* Canvas */}
       <div className="relative flex-1 overflow-y-auto">
-        <div className="absolute inset-0 bg-[radial-gradient(circle,#1e293b_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle,var(--border)_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none" />
         <div className="relative mx-auto flex max-w-2xl flex-col items-center gap-0 px-4 py-10">
-          <TriggerCard
-            type={state.trigger_type}
-            config={state.trigger_config}
-            onTypeChange={(t) => patchTop("trigger_type", t)}
-            onConfigChange={(c) => patchTop("trigger_config", c)}
-          />
-          <StepList
-            steps={state.steps}
-            parentPath={[]}
-            expandedId={expandedId}
-            setExpandedId={setExpandedId}
-            updateStep={updateStep}
-            addStepAt={addStepAt}
-            deleteStepAt={deleteStepAt}
-            moveStepAt={moveStepAt}
-          />
+          <ResourcesProvider>
+            <TriggerCard
+              type={state.trigger_type}
+              config={state.trigger_config}
+              onTypeChange={(t) => patchTop("trigger_type", t)}
+              onConfigChange={(c) => patchTop("trigger_config", c)}
+            />
+            <StepList
+              steps={state.steps}
+              parentPath={[]}
+              expandedId={expandedId}
+              setExpandedId={setExpandedId}
+              updateStep={updateStep}
+              addStepAt={addStepAt}
+              deleteStepAt={deleteStepAt}
+              moveStepAt={moveStepAt}
+            />
+          </ResourcesProvider>
         </div>
       </div>
     </div>
@@ -328,7 +633,7 @@ function TriggerCard({
     // Card width: full on mobile, fixed 320px on sm+. The canvas wrapper
     // (max-w-2xl + px-4) keeps this tidy on tablet/desktop.
     <div className="z-10 w-full max-w-[320px] sm:w-80">
-      <div className="rounded-lg border border-slate-800 border-l-4 border-l-blue-500 bg-slate-900 shadow-lg">
+      <div className="rounded-lg border border-border border-l-4 border-l-blue-500 bg-card shadow-lg">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
@@ -339,24 +644,24 @@ function TriggerCard({
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-[11px] uppercase tracking-wide text-blue-300">Trigger</div>
-            <div className="truncate text-sm font-medium text-white">
+            <div className="truncate text-sm font-medium text-foreground">
               {TRIGGER_OPTIONS.find((o) => o.value === type)?.label ?? type}
             </div>
           </div>
           <ChevronDown
-            className={cn("h-4 w-4 text-slate-400 transition-transform", open && "rotate-180")}
+            className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")}
           />
         </button>
         {open && (
-          <div className="space-y-3 border-t border-slate-800 px-4 py-3">
+          <div className="space-y-3 border-t border-border px-4 py-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-400">
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
                 Trigger type
               </label>
               <select
                 value={type}
                 onChange={(e) => onTypeChange(e.target.value as AutomationTriggerType)}
-                className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-white focus:border-primary focus:outline-none"
+                className="w-full rounded-md border border-border bg-muted px-2 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none"
               >
                 {TRIGGER_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -364,7 +669,7 @@ function TriggerCard({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] text-slate-500">
+              <p className="mt-1 text-[11px] text-muted-foreground">
                 {TRIGGER_OPTIONS.find((o) => o.value === type)?.hint}
               </p>
             </div>
@@ -375,14 +680,15 @@ function TriggerCard({
               />
             )}
             {type === "tag_added" && (
-              <Input
-                placeholder="Tag id"
-                value={(config.tag_id as string) ?? ""}
-                onChange={(e) =>
-                  onConfigChange({ ...config, tag_id: e.target.value })
-                }
-                className="bg-slate-800 text-white"
-              />
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  Tag
+                </label>
+                <TagSelect
+                  value={(config.tag_id as string) ?? ""}
+                  onChange={(v) => onConfigChange({ ...config, tag_id: v })}
+                />
+              </div>
             )}
             {type === "time_based" && (
               <Input
@@ -391,7 +697,7 @@ function TriggerCard({
                 onChange={(e) =>
                   onConfigChange({ ...config, schedule: e.target.value })
                 }
-                className="bg-slate-800 text-white"
+                className="bg-muted text-foreground"
               />
             )}
           </div>
@@ -409,34 +715,63 @@ function KeywordMatchConfig({
   onChange: (c: Record<string, unknown>) => void
 }) {
   const keywords = config?.keywords ?? []
+  // Keep a local draft string so the comma and trailing space aren't
+  // stripped on every keystroke (which made multi-word, comma-separated
+  // entry like "SEO, search engine optimization" impossible to type).
+  // We only parse into the keywords array on blur, then re-display the
+  // cleaned, rejoined form. Seeded once on mount; this component remounts
+  // when the trigger type changes, so the seed stays in sync.
+  const [draft, setDraft] = useState(keywords.join(", "))
+
+  // Persist the default the <select> displays. The dropdown falls back to
+  // "contains" for display, but leaving it untouched would otherwise omit
+  // match_type from the saved config — and activation validation then
+  // rejected it (trigger.match_type). Seed once on mount; the component
+  // remounts when the trigger type changes, matching the keywords draft.
+  useEffect(() => {
+    if (config?.match_type == null) {
+      onChange({ ...config, match_type: "contains" })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function commit() {
+    const parsed = draft
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+    setDraft(parsed.join(", "))
+    onChange({ ...config, keywords: parsed })
+  }
+
   return (
     <div className="space-y-2">
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-400">
+        <label className="mb-1 block text-xs font-medium text-muted-foreground">
           Keywords (comma-separated)
         </label>
         <Input
-          value={keywords.join(", ")}
-          onChange={(e) =>
-            onChange({
-              ...config,
-              keywords: e.target.value
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            })
-          }
-          className="bg-slate-800 text-white"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault()
+              commit()
+            }
+          }}
+          placeholder="e.g. pricing, demo request, talk to sales"
+          className="bg-muted text-foreground"
         />
       </div>
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-400">
+        <label className="mb-1 block text-xs font-medium text-muted-foreground">
           Match type
         </label>
         <select
           value={config?.match_type ?? "contains"}
           onChange={(e) => onChange({ ...config, match_type: e.target.value as "exact" | "contains" })}
-          className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-white focus:outline-none"
+          className="w-full rounded-md border border-border bg-muted px-2 py-1.5 text-sm text-foreground focus:outline-none"
         >
           <option value="contains">Contains</option>
           <option value="exact">Exact</option>
@@ -535,7 +870,7 @@ function StepRenderer({
       <div className={cn("z-10 flex flex-col", width)}>
         <div
           className={cn(
-            "rounded-lg border border-slate-800 border-l-4 bg-slate-900 shadow-lg",
+            "rounded-lg border border-border border-l-4 bg-card shadow-lg",
             meta.border,
           )}
         >
@@ -544,28 +879,28 @@ function StepRenderer({
             onClick={() => props.setExpandedId(expanded ? null : step.cid)}
             className="flex w-full items-center gap-3 px-4 py-3 text-left"
           >
-            <GripVertical className="h-4 w-4 flex-shrink-0 text-slate-600" aria-hidden />
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-800 text-slate-300">
+            <GripVertical className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden />
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
               <Icon className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] uppercase tracking-wide text-slate-400">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                 {isCondition ? "Condition" : step.step_type === "wait" ? "Wait" : "Action"}
               </div>
-              <div className="truncate text-sm font-medium text-white">{meta.label}</div>
-              <div className="truncate text-[11px] text-slate-500">{previewFor(step)}</div>
+              <div className="truncate text-sm font-medium text-foreground">{meta.label}</div>
+              <div className="truncate text-[11px] text-muted-foreground">{previewFor(step)}</div>
             </div>
             <ChevronDown
-              className={cn("h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")}
+              className={cn("h-4 w-4 text-muted-foreground transition-transform", expanded && "rotate-180")}
             />
           </button>
           {expanded && (
-            <div className="border-t border-slate-800 px-4 py-3">
+            <div className="border-t border-border px-4 py-3">
               <StepEditor
                 step={step}
                 onChange={(next) => props.updateStep(path, () => next)}
               />
-              <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-800 pt-3">
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
                 <div className="flex gap-1">
                   <Button
                     variant="ghost"
@@ -604,9 +939,14 @@ function StepRenderer({
         )}
       </div>
 
-      <AddButton
-        onPick={(t) => props.addStepAt(parentScope, index + 1, t)}
-      />
+      {/* A condition branches into Yes/No (rendered above by
+          ConditionBranches), so it has no linear "continue" path — adding
+          the trailing connector here would produce a spurious third output. */}
+      {!isCondition && (
+        <AddButton
+          onPick={(t) => props.addStepAt(parentScope, index + 1, t)}
+        />
+      )}
     </>
   )
 }
@@ -667,17 +1007,17 @@ function BranchColumn({
 function AddButton({ onPick }: { onPick: (t: AutomationStepType) => void }) {
   return (
     <div className="relative flex flex-col items-center">
-      <div className="h-4 w-[2px] bg-slate-700" aria-hidden />
+      <div className="h-4 w-[2px] bg-border" aria-hidden />
       <DropdownMenu>
         <DropdownMenuTrigger
-          className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-slate-700 bg-slate-950 text-slate-400 transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary data-[popup-open]:border-primary data-[popup-open]:bg-primary/20 data-[popup-open]:text-primary"
+          className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-border bg-background text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary data-[popup-open]:border-primary data-[popup-open]:bg-primary/20 data-[popup-open]:text-primary"
           aria-label="Add step"
         >
           <Plus className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="start"
-          className="max-h-80 min-w-56 overflow-y-auto border-slate-700 bg-slate-900"
+          className="max-h-80 min-w-56 overflow-y-auto border-border bg-popover"
         >
           {ADDABLE_STEPS.map((t) => {
             const Icon = STEP_META[t].icon
@@ -690,7 +1030,7 @@ function AddButton({ onPick }: { onPick: (t: AutomationStepType) => void }) {
           })}
         </DropdownMenuContent>
       </DropdownMenu>
-      <div className="h-4 w-[2px] bg-slate-700" aria-hidden />
+      <div className="h-4 w-[2px] bg-border" aria-hidden />
     </div>
   )
 }
@@ -765,31 +1105,19 @@ function StepEditor({
     }
     case "send_template":
       return (
-        <>
-          <FieldBlock label="Template name">
-            <Input
-              value={(cfg.template_name as string) ?? ""}
-              onChange={(e) => set({ template_name: e.target.value })}
-              className="bg-slate-800 text-white"
-            />
-          </FieldBlock>
-          <FieldBlock label="Language">
-            <Input
-              value={(cfg.language as string) ?? ""}
-              onChange={(e) => set({ language: e.target.value })}
-              className="bg-slate-800 text-white"
-            />
-          </FieldBlock>
-        </>
+        <SendTemplateFields
+          templateName={(cfg.template_name as string) ?? ""}
+          language={(cfg.language as string) ?? ""}
+          onChange={(patch) => set(patch)}
+        />
       )
     case "add_tag":
     case "remove_tag":
       return (
-        <FieldBlock label="Tag id">
-          <Input
+        <FieldBlock label="Tag">
+          <TagSelect
             value={(cfg.tag_id as string) ?? ""}
-            onChange={(e) => set({ tag_id: e.target.value })}
-            className="bg-slate-800 text-white"
+            onChange={(v) => set({ tag_id: v })}
           />
         </FieldBlock>
       )
@@ -800,18 +1128,17 @@ function StepEditor({
             <select
               value={(cfg.mode as string) ?? "round_robin"}
               onChange={(e) => set({ mode: e.target.value })}
-              className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-white"
+              className="w-full rounded-md border border-border bg-muted px-2 py-1.5 text-sm text-foreground"
             >
               <option value="round_robin">Round-robin</option>
               <option value="specific">Specific agent</option>
             </select>
           </FieldBlock>
           {cfg.mode === "specific" && (
-            <FieldBlock label="Agent id">
-              <Input
+            <FieldBlock label="Agent">
+              <AgentSelect
                 value={(cfg.agent_id as string) ?? ""}
-                onChange={(e) => set({ agent_id: e.target.value })}
-                className="bg-slate-800 text-white"
+                onChange={(v) => set({ agent_id: v })}
               />
             </FieldBlock>
           )}
@@ -821,21 +1148,17 @@ function StepEditor({
       return (
         <>
           <FieldBlock label="Field">
-            <select
+            <ContactFieldSelect
               value={(cfg.field as string) ?? "name"}
-              onChange={(e) => set({ field: e.target.value })}
-              className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-white"
-            >
-              <option value="name">Name</option>
-              <option value="email">Email</option>
-              <option value="company">Company</option>
-            </select>
+              onChange={(v) => set({ field: v })}
+            />
           </FieldBlock>
           <FieldBlock label="Value">
             <Input
               value={(cfg.value as string) ?? ""}
               onChange={(e) => set({ value: e.target.value })}
-              className="bg-slate-800 text-white"
+              placeholder="Text or {{ vars.x }} / {{ message.text }}"
+              className="bg-muted text-foreground"
             />
           </FieldBlock>
         </>
@@ -847,21 +1170,21 @@ function StepEditor({
             <Input
               value={(cfg.pipeline_id as string) ?? ""}
               onChange={(e) => set({ pipeline_id: e.target.value })}
-              className="bg-slate-800 text-white"
+              className="bg-muted text-foreground"
             />
           </FieldBlock>
           <FieldBlock label="Stage id">
             <Input
               value={(cfg.stage_id as string) ?? ""}
               onChange={(e) => set({ stage_id: e.target.value })}
-              className="bg-slate-800 text-white"
+              className="bg-muted text-foreground"
             />
           </FieldBlock>
           <FieldBlock label="Title">
             <Input
               value={(cfg.title as string) ?? ""}
               onChange={(e) => set({ title: e.target.value })}
-              className="bg-slate-800 text-white"
+              className="bg-muted text-foreground"
             />
           </FieldBlock>
           <FieldBlock label="Value">
@@ -869,7 +1192,7 @@ function StepEditor({
               type="number"
               value={(cfg.value as number) ?? 0}
               onChange={(e) => set({ value: Number(e.target.value) })}
-              className="bg-slate-800 text-white"
+              className="bg-muted text-foreground"
             />
           </FieldBlock>
         </>
@@ -883,14 +1206,14 @@ function StepEditor({
               min={1}
               value={(cfg.amount as number) ?? 1}
               onChange={(e) => set({ amount: Math.max(1, Number(e.target.value)) })}
-              className="bg-slate-800 text-white"
+              className="bg-muted text-foreground"
             />
           </FieldBlock>
           <FieldBlock label="Unit">
             <select
               value={(cfg.unit as string) ?? "hours"}
               onChange={(e) => set({ unit: e.target.value })}
-              className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-white"
+              className="w-full rounded-md border border-border bg-muted px-2 py-1.5 text-sm text-foreground"
             >
               <option value="minutes">Minutes</option>
               <option value="hours">Hours</option>
@@ -906,7 +1229,7 @@ function StepEditor({
             <select
               value={(cfg.subject as string) ?? "tag_presence"}
               onChange={(e) => set({ subject: e.target.value })}
-              className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-white"
+              className="w-full rounded-md border border-border bg-muted px-2 py-1.5 text-sm text-foreground"
             >
               <option value="tag_presence">Tag presence</option>
               <option value="contact_field">Contact field</option>
@@ -927,7 +1250,7 @@ function StepEditor({
               }
               value={(cfg.operand as string) ?? ""}
               onChange={(e) => set({ operand: e.target.value })}
-              className="bg-slate-800 text-white"
+              className="bg-muted text-foreground"
             />
           </FieldBlock>
           {(cfg.subject === "contact_field" || cfg.subject === "message_content") && (
@@ -935,7 +1258,7 @@ function StepEditor({
               <Input
                 value={(cfg.value as string) ?? ""}
                 onChange={(e) => set({ value: e.target.value })}
-                className="bg-slate-800 text-white"
+                className="bg-muted text-foreground"
               />
             </FieldBlock>
           )}
@@ -948,21 +1271,21 @@ function StepEditor({
             <Input
               value={(cfg.url as string) ?? ""}
               onChange={(e) => set({ url: e.target.value })}
-              className="bg-slate-800 text-white"
+              className="bg-muted text-foreground"
             />
           </FieldBlock>
           <FieldBlock label="Body template (JSON)">
             <Textarea
               value={(cfg.body_template as string) ?? ""}
               onChange={(e) => set({ body_template: e.target.value })}
-              className="min-h-20 bg-slate-800 font-mono text-xs text-white"
+              className="min-h-20 bg-muted font-mono text-xs text-foreground"
             />
           </FieldBlock>
         </>
       )
     case "close_conversation":
       return (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-muted-foreground">
           Sets the conversation status to &quot;closed&quot;. No configuration needed.
         </p>
       )
@@ -980,7 +1303,7 @@ function FieldBlock({
 }) {
   return (
     <div className="mb-2 last:mb-0">
-      <label className="mb-1 block text-xs font-medium text-slate-400">{label}</label>
+      <label className="mb-1 block text-xs font-medium text-muted-foreground">{label}</label>
       {children}
     </div>
   )

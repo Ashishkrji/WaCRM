@@ -109,12 +109,15 @@ export default function MarketingLayout({
             </div>
           </div>
 
-          <div className="mt-12 border-t border-slate-900 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="mt-12 border-t border-slate-900 pt-8 space-y-2">
             <p className="text-xs text-slate-500">
-              &copy; {new Date().getFullYear()} MJChatSyncs. All rights reserved.
+              &copy; 2026 wacrm. All rights reserved.
             </p>
-            <p className="text-xs text-slate-500 flex items-center gap-1">
-              Built with <Heart className="h-3 w-3 text-red-500 fill-red-500" /> for Enterprise Scale.
+            <p className="text-xs text-slate-500">
+              Built on the official WhatsApp Business API.
+            </p>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              WhatsApp&reg; is a registered trademark of Meta Platforms, Inc. Hostinger is not affiliated with, endorsed by, or sponsored by Meta Platforms, Inc.
             </p>
           </div>
         </div>

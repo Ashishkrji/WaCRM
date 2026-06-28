@@ -3,103 +3,118 @@
 > **Fork it, brand it, host it, own it.**  
 > A premium, fully self-hostable, production-ready WhatsApp® Business API CRM. Featuring a multi-agent shared inbox, automated contact segmentation, multi-stage sales pipelines, broadcast messaging, visual no-code automations, AI chatbot/router integration, and dynamic website chat widgets. **Zero seat limits, zero subscription fees.**
 
-[![Deploy on Hostinger](https://img.shields.io/badge/Deploy_on-Hostinger-673DE6?style=for-the-badge&logo=hostinger&logoColor=white)](https://www.hostinger.com/web-apps-hosting)
-[![Deploy on Vercel](https://img.shields.io/badge/Deploy_to-Vercel-black?logo=vercel&logoColor=white)](https://vercel.com)
+<p align="center">
+  <a href="https://www.hostinger.com/web-apps-hosting">
+    <img src="./.github/assets/hostinger-deploy.png" alt="Ship your Node.js app in one click — Deploy to Hostinger" width="900">
+  </a>
+</p>
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-violet.svg)](./LICENSE)
-[![Next.js 16](https://img.shields.io/badge/Next.js-16%20(Turbopack)-black?logo=nextdotjs)](https://nextjs.org)
+[![CI](https://github.com/AshishKmj/MJChatSyncs/actions/workflows/ci.yml/badge.svg)](https://github.com/AshishKmj/MJChatSyncs/actions/workflows/ci.yml)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs)](https://nextjs.org)
 [![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3ecf8e?logo=supabase)](https://supabase.com)
-[![TailwindCSS 4](https://img.shields.io/badge/TailwindCSS-v4.0-38bdf8?logo=tailwindcss)](https://tailwindcss.com)
+[![Stars](https://img.shields.io/github/stars/AshishKmj/MJChatSyncs?style=social)](https://github.com/AshishKmj/MJChatSyncs/stargazers)
+[![Forks](https://img.shields.io/github/forks/AshishKmj/MJChatSyncs?style=social)](https://github.com/AshishKmj/MJChatSyncs/network/members)
 
----
+This repo is the product — clone or fork it to run your own CRM.
 
-## 🌟 Premium Features Overview
+## What you get out of the box
 
-MJChatSyncs is built to bypass expensive per-seat SaaS fees, providing you with a high-end customer management system.
+- **Shared inbox** on the official WhatsApp Business API — multiple agents working one number, per-conversation assignment, status, and notes.
+- **Contacts + tags + custom fields**, CSV import, deduplication.
+- **Sales pipelines** (Kanban) with deals linked to conversations.
+- **Broadcasts** with Meta-approved templates, delivery + read tracking, per-recipient variable substitution.
+- **No-code automations** — triggers on inbound messages, new contacts, keywords, or schedule; conditional branches, waits, tags, webhooks. Visual builder.
+- **Real-time dashboard** — response times, daily volume, pipeline value, cross-module activity feed.
+- **Team accounts** — invite teammates by link, role-based access (owner / admin / agent / viewer), ownership transfer. Every install is account-scoped, so one shared inbox can be staffed by a whole team. Solo use stays single-user with zero setup.
+- **Account management** — email, password, avatar, global sign-out.
+- **Public REST API** (`/api/v1`) with scoped, revocable API keys — build your own automations on top of your CRM. See [docs/public-api.md](./docs/public-api.md).
 
-```mermaid
-graph TD
-    A[WhatsApp Business Cloud API] -->|Webhooks| B(MJChatSyncs Server Engine)
-    B -->|Live Realtime Sync| C(Multi-Agent Shared Inbox)
-    B -->|Fallback Redundancy| D[Supabase Cloud Database]
-    B -->|Automatic Offline Bypass| E[Local Browser Cache / localStorage]
-    C --> F[NVIDIA AI / Custom LLM Chatbot]
-    C --> G[Website Chat Widget Builder]
-    C --> H[Sales Kanban Pipelines]
-    C --> I[Contact & Tag Segmentation]
-    C --> J[Marketing Automation Engine]
+## Why fork this?
+
+This is a **template**, not a product. Forking means you get:
+
+- **Full ownership** — your code, your Supabase project, your domain, your data. No SaaS lock-in, no seat pricing, no trust dance.
+- **Full customisation** — add the fields your team needs, remove the modules you don't, redesign anything. The stack is boring on purpose (Next.js + Supabase + Tailwind) so the learning curve is short.
+- **Zero ops to start** — [Hostinger](https://www.hostinger.com/web-apps-hosting) Managed Node.js deploys a fork in a few clicks. No Docker, no Kubernetes, no infra team needed. ([See below ↓](#-deploy-on-hostinger-recommended))
+- **Real security primitives** — token encryption (AES-256-GCM), RLS on every table, HMAC-verified webhooks, CSP, rate limiting, CI typecheck/build on every PR.
+
+Not a framework. Not an SDK. A concrete, working CRM you can stand up in an afternoon and make yours.
+
+## Quick start
+
+```bash
+# Fork on GitHub first: https://github.com/AshishKmj/MJChatSyncs → Fork
+git clone https://github.com/<your-username>/MJChatSyncs.git
+cd MJChatSyncs
+npm install
+cp .env.local.example .env.local   # fill in Supabase + Meta creds
+npm run dev
 ```
 
-### 🚀 Enterprise AI & Architecture Upgrades
-*   **Repository Pattern (Phase 1)**: Unified architecture merging Supabase (PostgreSQL) and MongoDB Atlas (Vector DB/NoSQL) with clean data abstractions (`knowledgeRepo`, `aiDataRepo`, etc.).
-*   **NVIDIA AI Integrations**: Support for state-of-the-art NVIDIA LLMs, semantic routing, lead scoring, conversation summarization, and automated strategy drafting.
-*   **Marketing Automation Engine**: Complete Omnichannel engagement! Audience segmentation, email campaigns, broadcast scheduling, dynamic workflows, referral tracking, and comprehensive UTM metrics.
+Open <http://localhost:3000>. You'll be redirected to `/login` (or `/dashboard` if already signed in).
 
-### 👥 1. Team & Agent Management (100% Direct UI CRUD)
-*   **Shared Inbox Collaborator**: Multiple agents can respond, reassign, add internal comments, and tag conversations in real-time.
-*   **Full UI Controls**: Invite new team members, edit access scopes, customize tasks, and permanently remove team members directly from the dashboard.
-*   **Granular Checkbox Permissions**: Toggle access to specific screens (e.g. Inbox, Analytics, Automations, Pipelines, Broadcasts, Settings) instantly.
-*   **Resilient Developer Bypass**: If the cloud database is offline during local development, the system automatically logs you in as a **Developer Admin** (`super_admin`) so you can test all features without interruption.
+## 🚀 Deploy on Hostinger (recommended)
 
-### 📱 2. WhatsApp Multi-Number Business API Setup
-*   **Simultaneous Multi-Number Support**: Connect, monitor, and send messages across multiple approved Meta WhatsApp Business API numbers at once.
-*   **Instant API Health Pinger**: Features an in-app health verification pinger next to each number to verify Meta Cloud API status in real-time.
-*   **Facebook Developer Portal Shortcut**: Includes a high-visibility button that redirects to `developers.facebook.com` in a new tab, pre-populating mock fields to accelerate configuration.
-*   **AES-256-GCM Secure Encryption**: Sensitive System User Access Tokens are encrypted server-side before writing to the Postgres database, ensuring military-grade security.
+<p align="center">
+  <a href="https://www.hostinger.com/web-apps-hosting">
+    <img src="./.github/assets/hostinger-deploy.png" alt="Ship your Node.js app in one click — Deploy to Hostinger" width="1000">
+  </a>
+</p>
+<p align="center">
+  <a href="./docs/deployment.md">
+    <img src="https://img.shields.io/badge/Step--by--step_guide-docs-111?style=for-the-badge" alt="Step-by-step guide" height="44">
+  </a>
+</p>
 
-### 🤖 3. AI Chatbot & Agent Router
-*   **Custom Endpoint Integration**: Connect custom LLMs or external chatbot endpoints with optional Bearer token authorization headers.
-*   **Human Agent Routing Handshake**: If the AI chatbot fails or a user asks for human support, it reads a routing payload (e.g. `{"action": "route_to_agent"}`) to immediately pause bot execution and alert active agents.
-*   **Dual Storage Resiliency**: Configuration inputs automatically write to your cloud Supabase database (`ai_router_config` table). If the migration hasn't been run yet, the app seamlessly falls back to browser `localStorage` to keep settings fully functional.
+**MJChatSyncs is built to run on [Hostinger](https://www.hostinger.com/web-apps-hosting).**
+It's the path we test, document, and recommend — and the fastest way to get a production-grade CRM live without owning a VPS or a Kubernetes cluster.
 
-### 💬 4. WhatsApp Chat Widget Builder for Websites
-*   **Interactive Expanding Popups**: Generates customized, lightweight, floating web widgets. When clicked, they expand into a high-fidelity welcome interface showing customized sub-statuses (e.g. "Online • Replies instantly") and support avatars.
-*   **5 Premium Theme Presets**:
-    *   `WhatsApp Classic`: White card layout with standard official WhatsApp Green header accents.
-    *   `Glassmorphism Glow`: Premium semi-translucent backdrop filter with bright emerald details.
-    *   `Vibrant Purple`: Modern corporate deep indigo to violet-purple gradient headers.
-    *   `Royal Gold`: Luxurious dark mode card with premium amber and gold headers.
-    *   `Sunset Rose`: Eye-catching high-contrast orange to rose-red gradient header styling.
-*   **Universal Platform Compatibility**: Exports a single, zero-dependency HTML/JS code snippet that integrates perfectly into:
-    *   **WordPress**: Paste into WPCode or Header/Footer inserters.
-    *   **Shopify & WooCommerce**: Insert into footer template liquid code slots.
-    *   **Wix, Squarespace, Webflow**: Paste directly inside custom HTML embedded boxes.
-    *   **Custom React/Vue/HTML Static Frameworks**.
+### Why Hostinger?
 
-### 📊 5. Sales Pipelines & Broadcasts
-*   **Multi-Stage Kanban Boards**: Create and customize sales pipelines with drag-and-drop lead routing and sales figures.
-*   **Bootstrap Demo Data**: Instantly load pre-configured pipeline cards and approved WhatsApp templates using the **"Load Examples"** button.
+| | |
+|---|---|
+| **One-click Git deploy** | Connect your fork, push to `main`, Hostinger builds and ships it. No SSH, no Docker, no CI to wire up — this repo's own `main` deploys this way. |
+| **Managed Node.js** | Next.js 16 (App Router, server actions, ISR) runs out of the box on [Premium, Business, and Cloud](https://www.hostinger.com/web-apps-hosting) shared plans. You don't manage Node versions, processes, or reverse proxies. |
+| **Free SSL + free domain** | Automatic Let's Encrypt on your custom domain (or a free one included with annual plans). HTTPS is on by default — required for the WhatsApp Business webhook. |
+| **Global CDN + LiteSpeed** | Static assets cached at the edge, dynamic routes served from LiteSpeed. Snappy dashboards out of the box, no Cloudflare setup required. |
+| **Env vars + logs in hPanel** | Set `SUPABASE_*`, `WHATSAPP_*`, and `ENCRYPTION_KEY` from the panel — no `.env` on the server. Live application logs in the same UI. |
+| **DDoS protection + daily backups** | Built-in, no add-ons. The webhook endpoint is a public target — having protection at the edge matters. |
+| **Cheaper than a VPS** | Plans start at a few dollars a month — order-of-magnitude less than a comparable managed Node.js host, and you don't pay extra for the database (that's Supabase). |
+| **24/7 human support** | Live chat support in 20+ languages — useful when your CRM is the thing your team relies on to talk to customers. |
 
----
+### The 60-second version
 
-## 🛠️ Codebase Tour & Directory Structure
+1. **Fork** this repo on GitHub.
+2. In **hPanel → Websites → Create**, pick **Node.js** and connect your fork.
+3. Paste your Supabase + Meta env vars into hPanel.
+4. Push to `main`. Hostinger builds and serves it. Done.
 
-Understanding the layout of MJChatSyncs allows you to modify the layout or add custom modules:
+Full walkthrough with screenshots:
+**[docs/deployment.md](./docs/deployment.md)**.
 
-```text
-MJChatSyncs-main/
-├── src/
-│   ├── app/                      # Next.js App Router Pages & API Routes
-│   │   ├── (auth)/               # Login, Signup, Reset Password pages
-│   │   ├── (dashboard)/          # Authenticated Panel Routes
-│   │   │   ├── inbox/            # Shared Inbox Live Panel
-│   │   │   ├── pipelines/        # Kanban board & Sales Deal Manager
-│   │   │   ├── ai-router/        # AI chatbot endpoint config screen
-│   │   │   ├── admin/            # Core Team Management and Dashboard
-│   │   │   └── widgets/          # Live Preview HTML Code Generator
-│   │   └── api/                  # Serverless API routes
-│   │       └── whatsapp/         # Webhooks & encryption gateway endpoints
-│   ├── components/               # Highly modular React elements
-│   │   ├── ui/                   # Reusable base styles (Buttons, Inputs, Modals)
-│   │   └── settings/             # Settings panels (team-manager, whatsapp-config, widget-manager)
-│   ├── hooks/                    # Custom React hooks (use-auth, use-supabase)
-│   ├── lib/                      # Cryptography and generic utility scripts
-│   └── types/                    # TypeScript interfaces
-├── supabase/
-│   └── migrations/               # PostgreSQL DB Migrations (001_initial_schema to 019_ai_router_config)
-├── .env.local.example            # Environment variables reference template
-├── package.json                  # Next.js scripts & dependency list
-└── tsconfig.json                 # Strict TypeScript configuration parameters
-```
+> _Note: MJChatSyncs is MIT-licensed and runs anywhere Node.js does (Vercel, Railway, your own VPS). Hostinger is recommended, not required._
+
+## Documentation
+
+Full self-host documentation — Supabase migrations, WhatsApp Business API config, and production deploy — lives in the `docs/` directory:
+- [Getting started / Deployment](./docs/deployment.md)
+- [Public API Reference](./docs/public-api.md)
+- [Workflow Architecture](./docs/workflow-architecture.md)
+
+## Stack
+
+- **App** — Next.js 16 (App Router), React 19, TypeScript, Tailwind v4.
+- **Data** — Supabase (Postgres + Auth + Storage + RLS).
+- **WhatsApp** — Meta Cloud API (official WhatsApp Business API).
+
+## Contributing
+
+This is a template, not a collaborative product — the expected flow is fork → customise → deploy, **not** upstream contribution. Bug reports and security issues are welcome; feature PRs often belong in your fork rather than here. Details in [`CONTRIBUTING.md`](./CONTRIBUTING.md) and [`.github/SECURITY.md`](./.github/SECURITY.md).
+
+## License
+
+[MIT](./LICENSE). Fork it, brand it, host it.
 
 ---
 
@@ -235,92 +250,8 @@ To receive live customer chats in your CRM inbox:
 3.  Set the fields:
     *   **Callback URL**: `https://your-public-domain.com/api/whatsapp/webhook`
     *   **Verify Token**: Set a custom secure string of your choosing (e.g. `MySecureMJChatSyncsToken123!`).
-4.  Copy this verification token string, go back to your MJChatSyncs Settings dashboard under the **Webhook Verification Token** panel, paste it, and save.
-5.  On the Meta Developers page, scroll to **Webhook Fields**, click **Manage**, find the **`messages`** row, and click **Subscribe**.
-6.  Send a WhatsApp text from a separate phone to your registered Business API number. The message will appear in your live CRM shared inbox instantly!
-
----
-
-### 🚢 5. Production Server Deployment Options
-
-#### 🟩 Option A: Vercel Deploy (Serverless Next.js Hosting)
-Deploying to Vercel requires less than two minutes:
-1.  Push your code fork to a private or public GitHub repository.
-2.  Create a free account on [Vercel](https://vercel.com).
-3.  Click **Add New > Project**, select your GitHub repository.
-4.  Configure the **Environment Variables** in the Vercel dashboard:
-    *   `NEXT_PUBLIC_SUPABASE_URL`
-    *   `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-    *   `SUPABASE_SERVICE_ROLE_KEY`
-    *   `ENCRYPTION_KEY` (Must be a valid 64-char hex string)
-5.  Click **Deploy**. Vercel will automatically compile the Turbopack production bundle.
-
-#### 🟪 Option B: Hostinger Managed Node.js App
-If you are hosting on Hostinger:
-1.  Log in to your Hostinger hPanel.
-2.  Navigate to your **VPS dashboard** or **Node.js Web App Manager** and create a new Node.js environment pointing to your repository.
-3.  Set your Node.js version parameter to `v20.x` or higher.
-4.  Input your Environment Variables under the Hostinger application config panel.
-5.  Configure your Start and Build scripts:
-    *   **Build command**: `npm run build`
-    *   **Start command**: `npm start`
-6.  Bind your domain name to the application. Your CRM is live!
-
-#### 🐋 Option C: Self-Hosted VPS (Nginx + PM2)
-For high-performance self-hosting on Ubuntu or Debian servers:
-1.  Install Node.js, Git, PM2, and Nginx:
-    ```bash
-    sudo apt update
-    sudo apt install -y nodejs npm git nginx
-    sudo npm install -g pm2
-    ```
-2.  Clone your project and create your production env file:
-    ```bash
-    git clone https://github.com/<your-username>/MJChatSyncs.git /var/www/MJChatSyncs
-    cd /var/www/MJChatSyncs
-    cp .env.local.example .env.local
-    # Edit the file to add credentials
-    nano .env.local
-    ```
-3.  Install modules and build the Next.js bundle:
-    ```bash
-    npm install
-    npm run build
-    ```
-4.  Launch the application using PM2:
-    ```bash
-    pm2 start npm --name "MJChatSyncs" -- start
-    pm2 save
-    pm2 startup
-    ```
-5.  Configure Nginx as a reverse proxy:
-    ```bash
-    sudo nano /etc/nginx/sites-available/MJChatSyncs
-    ```
-    Paste this configuration block:
-    ```nginx
-    server {
-        listen 80;
-        server_name yourdomain.com;
-
-        location / {
-            proxy_pass http://localhost:3000;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection 'upgrade';
-            proxy_set_header Host $host;
-            proxy_cache_bypass $http_upgrade;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-    }
-    ```
-6.  Enable the Nginx config, test syntax, and restart:
-    ```bash
-    sudo ln -s /etc/nginx/sites-available/MJChatSyncs /etc/nginx/sites-enabled/
-    sudo nginx -t
-    sudo systemctl restart nginx
-    ```
+    *   On the Meta Developers page, scroll to **Webhook Fields**, click **Manage**, find the **`messages`** row, and click **Subscribe**.
+4.  Send a WhatsApp text from a separate phone to your registered Business API number. The message will appear in your live CRM shared inbox instantly!
 
 ---
 
@@ -345,9 +276,3 @@ To help you custom-build features on top of MJChatSyncs, here is a breakdown of 
 1.  **Restrict the Service Role Key**: Never expose your `SUPABASE_SERVICE_ROLE_KEY` to the browser or push it to public repositories. It bypasses all Postgres row-level security.
 2.  **Meta Token Rotation**: Regularly verify and rotate your System User Tokens inside the Meta Business Manager portal.
 3.  **Strict Origin RLS**: Apply Row-Level Security policies to limit read/write actions on the `messages` table exclusively to authorized team members.
-
----
-
-## 📄 License
-
-This software is released under the terms of the [MIT License](./LICENSE). Feel free to fork, white-label, re-brand, commercialize, or build custom plugins on top of MJChatSyncs!

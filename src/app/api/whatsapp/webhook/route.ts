@@ -3,12 +3,17 @@ import { contactRepo, conversationRepo, messageRepo, dealRepo, meetingRepo, quot
 import { createClient } from '@supabase/supabase-js'
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption'
 import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api'
-import { normalizePhone, phonesMatch } from '@/lib/whatsapp/phone-utils'
+import { normalizePhone } from '@/lib/whatsapp/phone-utils'
+import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe'
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchAIReply } from '@/services/ai/engine'
 import { logWebhook } from '@/services/ai/mongodb-logger'
+import {
+  handleTemplateWebhookChange,
+  isTemplateWebhookField,
+} from '@/lib/whatsapp/template-webhook'
 
 // Lazy-initialized to avoid build-time crash when env vars are missing
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -193,6 +198,19 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
 
   for (const entry of body.entry) {
     for (const change of entry.changes) {
+      // Template-lifecycle events (status / quality / components
+      // updates from Meta) come in on a different change.field and
+      // have a different value shape — route them through the
+      // dedicated handler. Skip the messaging branches below so we
+      // don't try to read message-shaped fields off a template event.
+      if (isTemplateWebhookField(change.field)) {
+        await handleTemplateWebhookChange(
+          { field: change.field, value: change.value as unknown },
+          supabaseAdmin(),
+        )
+        continue
+      }
+
       const value = change.value
 
       // Handle status updates
@@ -207,17 +225,42 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
 
       const phoneNumberId = value.metadata.phone_number_id
 
-      // Find user's config by phone_number_id
-      const { data: config, error: configError } = await supabaseAdmin()
+      // Find user's config by phone_number_id. `.single()` returns
+      // PGRST116 for both 0 rows AND ≥2 rows — distinguish them so
+      // operators see the real cause in logs. ≥2 rows shouldn't happen
+      // post-migration 013 (UNIQUE constraint), but a row created
+      // before the constraint, or a race, would still surface here.
+      const { data: configRows, error: configError } = await supabaseAdmin()
         .from('whatsapp_config')
         .select('*')
         .eq('phone_number_id', phoneNumberId)
-        .single()
 
-      if (configError || !config) {
+      if (configError) {
+        console.error(
+          'Error fetching whatsapp_config for phone_number_id:',
+          phoneNumberId,
+          configError
+        )
+        continue
+      }
+
+      if (!configRows || configRows.length === 0) {
         console.error('No config found for phone_number_id:', phoneNumberId)
         continue
       }
+
+      if (configRows.length > 1) {
+        console.error(
+          `Multiple configs (${configRows.length}) found for phone_number_id:`,
+          phoneNumberId,
+          '— inbound message dropped. Resolve duplicates so each number maps to a single account.',
+          'Account owners:',
+          configRows.map((r: { account_id: string; user_id: string }) => `${r.account_id} (admin ${r.user_id})`)
+        )
+        continue
+      }
+
+      const config = configRows[0]
 
       // Log the incoming webhook to MongoDB Atlas
       void logWebhook({
@@ -236,6 +279,12 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
         await processMessage(
           message,
           contact,
+          // Tenancy — drives every contact / conversation lookup
+          // and the engines' active-row dispatch.
+          config.account_id,
+          // Audit / sender-of-record — used as the user_id on row
+          // inserts that need it for NOT NULL FK compliance. Always
+          // the admin who saved the WhatsApp config.
           config.user_id,
           decryptedAccessToken
         )
@@ -348,14 +397,17 @@ async function handleStatusUpdate(status: {
  * Runs on a best-effort basis — failures here must not break the
  * main inbound-message flow, so errors are swallowed with a log.
  */
-async function flagBroadcastReplyIfAny(organizationId: string, contactId: string) {
+async function flagBroadcastReplyIfAny(accountId: string, contactId: string) {
   try {
-    // Most recent outbound broadcast that hasn't been replied to yet.
+    // Most recent outbound broadcast in this account that hasn't
+    // been replied to yet. Account-scoped so a shared inbox reply
+    // marks the broadcast as replied regardless of which teammate
+    // sent it.
     const { data: recs, error } = await supabaseAdmin()
       .from('broadcast_recipients')
-      .select('id, status, broadcast_id, broadcasts!inner(user_id)')
+      .select('id, status, broadcast_id, broadcasts!inner(account_id)')
       .eq('contact_id', contactId)
-      .eq('broadcasts.user_id', organizationId)
+      .eq('broadcasts.account_id', accountId)
       .in('status', ['sent', 'delivered', 'read'])
       .order('created_at', { ascending: false })
       .limit(1)
@@ -460,7 +512,14 @@ async function handleReaction(
 async function processMessage(
   message: WhatsAppMessage,
   contact: { profile: { name: string }; wa_id: string },
-  organizationId: string,
+  // Tenancy. Resolved from the matched whatsapp_config row; every
+  // contact / conversation / message row created downstream is
+  // stamped with this so any member of the account can see it.
+  accountId: string,
+  // Sender-of-record for inserts that need a NOT NULL user_id FK
+  // (contacts, conversations). Always the admin who saved the
+  // WhatsApp config; the choice is arbitrary post-017 but stable.
+  configOwnerUserId: string,
   accessToken: string
 ) {
   const senderPhone = normalizePhone(message.from)
@@ -468,7 +527,8 @@ async function processMessage(
 
   // Find or create contact
   const contactOutcome = await findOrCreateContact(
-    organizationId,
+    accountId,
+    configOwnerUserId,
     senderPhone,
     contactName
   )
@@ -477,7 +537,8 @@ async function processMessage(
 
   // Find or create conversation
   const conversation = await findOrCreateConversation(
-    organizationId,
+    accountId,
+    configOwnerUserId,
     contactRecord.id
   )
   if (!conversation) return
@@ -569,7 +630,7 @@ async function processMessage(
   // If this contact was a recent broadcast recipient, flag the reply
   // so the broadcast's `replied_count` advances (via the aggregate
   // trigger installed in migration 003).
-  await flagBroadcastReplyIfAny(organizationId, contactRecord.id)
+  await flagBroadcastReplyIfAny(accountId, contactRecord.id)
 
   // ============================================================
   // Flow runner dispatch.
@@ -591,7 +652,8 @@ async function processMessage(
   // basically for free (one indexed SELECT for the active run).
   // ============================================================
   const flowResult = await dispatchInboundToFlows({
-    userId: organizationId,
+    accountId,
+    userId: configOwnerUserId,
     contactId: contactRecord.id,
     conversationId: conversation.id,
     message:
@@ -638,7 +700,7 @@ async function processMessage(
   if (isFirstInboundMessage) automationTriggers.unshift('first_inbound_message')
   for (const triggerType of automationTriggers) {
     runAutomationsForTrigger({
-      organizationId,
+      accountId,
       triggerType,
       contactId: contactRecord.id,
       context: {
@@ -655,7 +717,7 @@ async function processMessage(
   // ============================================================
   if (!flowConsumed) {
     dispatchAIReply({
-      userId: organizationId,
+      userId: configOwnerUserId,
       contactId: contactRecord.id,
       conversationId: conversation.id,
       inboundText,
@@ -820,31 +882,99 @@ interface ContactOutcome {
 }
 
 async function findOrCreateContact(
-  organizationId: string,
+  accountId: string,
+  configOwnerUserId: string,
   phone: string,
   name: string
 ): Promise<ContactOutcome | null> {
-  try {
-    const outcome = await syncRepo.syncLead(organizationId, { phone, name })
-    return {
-      contact: outcome.contact,
-      wasCreated: outcome.wasCreated,
+  // Find an existing contact for this account by phone. The shared
+  // helper pre-filters in SQL by the last-8-digit suffix (so we don't
+  // pull every contact on every inbound message) then applies the
+  // strict `phonesMatch` in JS on the small candidate set. The same
+  // helper backs the manual contact form and CSV import, so all three
+  // paths agree on what "same number" means (issue #212).
+  const existingContact = await findExistingContact(
+    supabaseAdmin(),
+    accountId,
+    phone,
+  )
+
+  if (existingContact) {
+    // Update name if it changed
+    if (name && name !== existingContact.name) {
+      await supabaseAdmin()
+        .from('contacts')
+        .update({ name, updated_at: new Date().toISOString() })
+        .eq('id', existingContact.id)
     }
-  } catch (err) {
-    console.error('Error syncing contact:', err)
+    return { contact: existingContact, wasCreated: false }
+  }
+
+  // Create new contact. account_id is the tenancy column;
+  // user_id is the NOT NULL FK audit column (no inbound message
+  // has a single "user who created" it — we attribute to the
+  // WhatsApp config owner as a stable default).
+  const { data: newContact, error: createError } = await supabaseAdmin()
+    .from('contacts')
+    .insert({
+      account_id: accountId,
+      user_id: configOwnerUserId,
+      phone,
+      name: name || phone,
+    })
+    .select()
+    .single()
+
+  if (createError) {
+    // Lost a race: a concurrent inbound delivery (or another path)
+    // created this contact between our lookup and insert, and the
+    // unique index (migration 022) rejected the duplicate. Re-resolve
+    // the existing row instead of dropping the message.
+    if (isUniqueViolation(createError)) {
+      const raced = await findExistingContact(supabaseAdmin(), accountId, phone)
+      if (raced) return { contact: raced, wasCreated: false }
+    }
+    console.error('Error creating contact:', createError)
     return null
   }
+
+  if (newContact) {
+    return { contact: newContact, wasCreated: true }
+  }
+  return null
 }
 
-async function findOrCreateConversation(organizationId: string, contactId: string) {
-  try {
-    const existing = await conversationRepo.findByContact(organizationId, contactId)
-    if (existing) {
-      return existing
-    }
-    return await conversationRepo.create({ user_id: organizationId, contact_id: contactId })
-  } catch (err) {
-    console.error('Error finding/creating conversation:', err)
+async function findOrCreateConversation(
+  accountId: string,
+  configOwnerUserId: string,
+  contactId: string,
+) {
+  // Look for existing conversation in this account
+  const { data: existing, error: findError } = await supabaseAdmin()
+    .from('conversations')
+    .select('*')
+    .eq('account_id', accountId)
+    .eq('contact_id', contactId)
+    .single()
+
+  if (!findError && existing) {
+    return existing
+  }
+
+  // Create new conversation. Same tenancy + audit split as
+  // findOrCreateContact above.
+  const { data: newConv, error: createError } = await supabaseAdmin()
+    .from('conversations')
+    .insert({
+      account_id: accountId,
+      user_id: configOwnerUserId,
+      contact_id: contactId,
+    })
+    .select()
+    .single()
+
+  if (createError) {
+    console.error('Error creating conversation:', createError)
     return null
   }
 }

@@ -11,7 +11,7 @@
 !.yarn/versions
 
 # testing
-/coverage
+/coverage 
 
 # next.js
 /.next/
@@ -42,3 +42,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Explicit User Ignores
+.agents
+.next
+.env.local

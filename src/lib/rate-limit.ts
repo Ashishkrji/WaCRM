@@ -125,6 +125,29 @@ export const RATE_LIMITS = {
    *  fidget with reactions and a single "swap" is actually two calls
    *  (remove + add) under the hood. */
   react: { limit: 120, windowMs: 60_000 },
+  /** Invitation peek (public, per-IP). 30/min lets a forwarded link
+   *  retry a handful of times under flaky connectivity without
+   *  enabling brute-force token enumeration. With 256-bit tokens the
+   *  enumeration risk is theoretical; this is belt-and-braces. */
+  invitationPeek: { limit: 30, windowMs: 60_000 },
+  /** Invitation redeem (authed, per-IP+user). Tighter than peek —
+   *  successful redemption mutates two profiles and an invite row, so
+   *  the abuse surface is "spam join attempts." */
+  invitationRedeem: { limit: 10, windowMs: 60_000 },
+  /** Admin-only account / member-management actions: create/revoke
+   *  invitation, rename account, change member role, remove member,
+   *  transfer ownership. 30/min per user is comfortably above any
+   *  realistic legitimate use (the Members tab is a clicks-only UI)
+   *  while still bounding accidental abuse from a script run in a
+   *  loop or a compromised admin session spamming role flips. */
+  adminAction: { limit: 30, windowMs: 60_000 },
+  /** Public REST API (`/api/v1/*`), keyed per API key. 120/min ≈ 2
+   *  req/s sustained — comfortable for a polling integration or an
+   *  automation firing on inbound events, while bounding a runaway
+   *  script. Like every bucket here it's per-process; a multi-
+   *  instance deploy needs the Redis swap described at the top of
+   *  this file (the per-key call sites don't change). */
+  publicApi: { limit: 120, windowMs: 60_000 },
 } as const;
 
 /** Test-only helper. Clears the in-memory state so unit tests don't

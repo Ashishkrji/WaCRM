@@ -12,6 +12,10 @@ import { toast } from "sonner";
 import { WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Remembers the agent's show/hide choice for the desktop contact panel
+// across reloads and sessions (device-scoped, like the theme prefs).
+const CONTACT_PANEL_STORAGE_KEY = "wacrm:inbox:contact-panel-open";
+
 export default function InboxPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,6 +42,36 @@ export default function InboxPage() {
    * once on conversationId-change as usual.
    */
   const [resyncToken, setResyncToken] = useState(0);
+
+  /**
+   * Whether the desktop contact sidebar (tags / deals / notes) is shown.
+   * Defaults to `true` (the historical behaviour) and is restored from
+   * localStorage after mount. We deliberately do NOT read localStorage in
+   * the initializer: the server renders with `true`, so reading a stored
+   * `false` synchronously would produce a hydration mismatch. The effect
+   * below reconciles to the stored value right after mount instead.
+   */
+  const [contactPanelOpen, setContactPanelOpen] = useState(true);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(CONTACT_PANEL_STORAGE_KEY);
+      if (stored !== null) setContactPanelOpen(stored === "true");
+    } catch {
+      // localStorage can throw in private-browsing / sandboxed contexts.
+    }
+  }, []);
+
+  const handleToggleContactPanel = useCallback(() => {
+    setContactPanelOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(CONTACT_PANEL_STORAGE_KEY, String(next));
+      } catch {
+        // Persistence is best-effort; ignore storage failures.
+      }
+      return next;
+    });
+  }, []);
 
   // Fire the deep-link auto-select exactly once per URL — subsequent
   // list refreshes (realtime, manual refetch) must not snap the user
@@ -132,12 +166,27 @@ export default function InboxPage() {
 
       if (!user) return;
 
-      // Table is `whatsapp_config` (singular) — the previous "whatsapp_configs"
-      // query always returned no rows, so the banner always showed "not connected".
+      // whatsapp_config is one-row-per-account post-multi-user, so
+      // the previous `.eq('user_id', user.id)` would miss the row
+      // for any teammate who didn't personally save the config —
+      // the "WhatsApp not connected" banner would show in the
+      // shared inbox even though the admin had it configured.
+      // Resolve account_id via the profile and query by that.
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("account_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const accountId = profile?.account_id as string | undefined;
+      if (!accountId) {
+        setWhatsappConnected(false);
+        return;
+      }
+
       const { data } = await supabase
         .from("whatsapp_config")
         .select("status")
-        .eq("user_id", user.id)
+        .eq("account_id", accountId)
         .maybeSingle();
 
       setWhatsappConnected(data?.status === "connected");
@@ -556,10 +605,16 @@ export default function InboxPage() {
         {/* Center panel: Message thread.
             Hidden on mobile when no conversation is selected so the
             list can occupy the full width. Always visible on lg+
-            (shows its own empty-state if no thread is picked yet). */}
+            (shows its own empty-state if no thread is picked yet).
+
+            `min-w-0` is load-bearing: without it, a single wide piece
+            of content inside the thread (long quote preview, very
+            long URL in a message body) forces the flex child past
+            its share and pushes the contact-sidebar panel off-screen
+            on the right. Issue #165. */}
         <div
           className={cn(
-            "flex h-full flex-1 lg:flex",
+            "flex h-full min-w-0 flex-1 lg:flex",
             hasActiveConv ? "flex" : "hidden lg:flex",
           )}
         >
@@ -576,16 +631,23 @@ export default function InboxPage() {
             onBack={handleCloseConversation}
             resyncToken={resyncToken}
             onRefresh={handleManualRefresh}
+            contactPanelOpen={contactPanelOpen}
+            onToggleContactPanel={handleToggleContactPanel}
           />
         </div>
 
-        {/* Right panel: Contact sidebar — desktop only. */}
-        <div className="hidden lg:block">
-          <ContactSidebar
-            contact={activeContact}
-            onContactUpdate={handleContactUpdate}
-          />
-        </div>
+        {/* Right panel: Contact sidebar — desktop only, and only when the
+            agent hasn't collapsed it via the thread-header toggle (#258).
+            On mobile it's always hidden (the `lg:block` below), so the
+            toggle — which is itself desktop-only — never affects it. */}
+        {contactPanelOpen && (
+          <div className="hidden lg:block">
+            <ContactSidebar
+              contact={activeContact}
+              onContactUpdate={handleContactUpdate}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

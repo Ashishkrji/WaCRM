@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/hooks/use-auth'
+import { formatCurrency } from '@/lib/currency'
 import {
   MessageSquare,
   UserPlus,
@@ -48,6 +50,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const queryTab = searchParams.get('tab')
+  const { defaultCurrency } = useAuth()
 
   useEffect(() => {
     if (queryTab === 'workspace') {
@@ -66,7 +69,6 @@ export default function DashboardPage() {
       router.replace('/team');
     }
   }, [queryTab, router]);
-
   const [metrics, setMetrics] = useState<MetricsBundle | null>(null)
   const [metricsLoading, setMetricsLoading] = useState(true)
 
@@ -159,8 +161,8 @@ export default function DashboardPage() {
     <div className="space-y-5">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Live analytics across conversations, contacts, deals, broadcasts, and automations.
         </p>
       </div>
@@ -195,7 +197,7 @@ export default function DashboardPage() {
             />
             <MetricCard
               title="Open Deals Value"
-              value={formatCurrency(metrics.openDealsValue)}
+              value={formatCurrency(metrics.openDealsValue, defaultCurrency)}
               icon={DollarSign}
               subtitle={`${metrics.openDealsCount} open deal${metrics.openDealsCount === 1 ? '' : 's'}`}
             />
@@ -290,7 +292,11 @@ export default function DashboardPage() {
           />
         </div>
         <div className="h-full lg:col-span-2">
-          <PipelineDonut data={pipeline} loading={pipelineLoading} />
+          <PipelineDonut
+            data={pipeline}
+            loading={pipelineLoading}
+            currency={defaultCurrency}
+          />
         </div>
       </div>
 
@@ -304,15 +310,6 @@ export default function DashboardPage() {
 }
 
 // ------------------------------------------------------------
-
-function formatCurrency(v: number): string {
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(v)
-}
 
 function deltaLabel(delta: number, suffix: string): string {
   if (delta === 0) return `No change ${suffix}`

@@ -25,8 +25,12 @@ const SECURITY_HEADERS = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   {
+    // Microphone is allowed for same-origin (`self`) so the inbox
+    // composer can record voice notes via MediaRecorder. Everything
+    // else stays denied — a compromised dependency can't silently grab
+    // the camera / geolocation / etc.
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    value: "camera=(), microphone=(self), geolocation=(), payment=(), usb=()",
   },
   {
     key: "Content-Security-Policy-Report-Only",
@@ -42,6 +46,9 @@ const SECURITY_HEADERS = [
       // https URLs paste-able from the UI), OG images, data URLs for
       // tiny inline assets.
       "img-src 'self' data: blob: https:",
+      // Outbound media previews (blob: from MediaRecorder + file picker)
+      // and Supabase public-bucket audio/video the inbox renders.
+      "media-src 'self' blob: https://*.supabase.co",
       "font-src 'self' data:",
       // Supabase REST + realtime (WSS). All Meta API calls happen
       // server-side, so graph.facebook.com does not belong here.
@@ -68,9 +75,9 @@ const nextConfig: NextConfig = {
    *   did nothing because the cache is server-side.
    *
    * Strategy:
-   *   - /_next/static/* — immutable for a year. Filenames are
-   *     content-hashed, so a new build produces new filenames; the
-   *     old ones are safe to keep indefinitely in caches.
+   *   - /_next/static/* — leave to Next. Turbopack dev chunks can go
+   *     stale if we force immutable caching here; Next already emits
+   *     the correct production headers for hashed assets.
    *   - /api/*          — no-store. API responses are per-user and
    *     must never be shared across requests at the edge.
    *   - Everything else — public, brief s-maxage + generous
@@ -99,7 +106,7 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Cache-Control", value: "no-store" }],
       },
       {
-        source: "/:path*",
+        source: "/:path((?!_next/static|_next/image|api).*)",
         headers: [
           {
             key: "Cache-Control",

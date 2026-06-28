@@ -1,14 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MessageSquare, CheckCircle, Clock, BarChart3, MessageCircle, Eye, EyeOff } from "lucide-react";
 
-export default function SignupPage() {
+function SignupForm() {
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("invite");
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,6 +36,10 @@ export default function SignupPage() {
     setLoading(true);
     const fullPhoneNumber = `${countryCode}${phone.replace(/\D/g, "")}`;
 
+    const emailRedirectTo = inviteToken
+      ? `${window.location.origin}/join/${encodeURIComponent(inviteToken)}`
+      : undefined;
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -40,6 +48,7 @@ export default function SignupPage() {
           full_name: fullName,
           phone: fullPhoneNumber,
         },
+        ...(emailRedirectTo ? { emailRedirectTo } : {}),
       },
     });
 
@@ -84,7 +93,7 @@ export default function SignupPage() {
               We&apos;ve sent a confirmation link to <span className="text-white font-semibold">{email}</span>. Please check your inbox and click the link to verify your account.
             </p>
           </div>
-          <Link href="/login" className="block">
+          <Link href={inviteToken ? `/login?invite=${encodeURIComponent(inviteToken)}` : "/login"} className="block">
             <Button
               variant="outline"
               className="w-full h-11 border-slate-900 bg-slate-950/60 text-slate-300 hover:bg-slate-900 hover:text-white transition-colors"
@@ -231,7 +240,7 @@ export default function SignupPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-550 hover:text-slate-400 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 transition-colors"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -255,7 +264,7 @@ export default function SignupPage() {
                         <option value="+44">🇬🇧 +44</option>
                         <option value="+971">🇦🇪 +971</option>
                       </select>
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-550">
                         <span className="text-[10px]">▼</span>
                       </div>
                     </div>
@@ -293,7 +302,7 @@ export default function SignupPage() {
               <p className="text-center text-xs text-slate-500">
                 Already have an account?{" "}
                 <Link
-                  href="/login"
+                  href={inviteToken ? `/login?invite=${encodeURIComponent(inviteToken)}` : "/login"}
                   className="font-bold text-blue-500 hover:text-blue-400 transition-colors"
                 >
                   Sign in
@@ -304,5 +313,17 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-slate-400 font-mono text-xs">
+        Loading...
+      </div>
+    }>
+      <SignupForm />
+    </Suspense>
   );
 }
