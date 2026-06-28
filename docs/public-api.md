@@ -1,6 +1,6 @@
 # Public API (`/api/v1`)
 
-The public API lets you drive your wacrm instance from your own
+The public API lets you drive your MJChatSyncs instance from your own
 scripts and automations — send messages, manage contacts, launch
 broadcasts — without going through the dashboard UI.
 
@@ -28,7 +28,7 @@ In the dashboard: **Settings → API keys → New API key**. Only
 
 1. Give the key a name (after the integration that will use it).
 2. Grant the **scopes** it needs — nothing more (see below).
-3. Copy the key. **The full key is shown exactly once.** wacrm
+3. Copy the key. **The full key is shown exactly once.** MJChatSyncs
    stores only a SHA-256 hash, so it can never be shown again. If you
    lose it, revoke it and create a new one.
 

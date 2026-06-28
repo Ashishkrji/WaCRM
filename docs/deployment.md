@@ -49,7 +49,7 @@ sudo apt install -y nginx
 ### Step 2: Clone and Configure App
 ```bash
 # Clone the repository
-git clone https://github.com/Ashishkrji/MJChatSyncs.git /var/www/MJChatSyncs
+git clone https://github.com/AshishKmj/MJChatSyncs.git /var/www/MJChatSyncs
 cd /var/www/MJChatSyncs
 
 # Copy and edit local environment variables

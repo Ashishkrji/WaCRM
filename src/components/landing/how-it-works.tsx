@@ -1,67 +1,68 @@
-import { Plug, Users, Zap } from 'lucide-react'
-import { Section, SectionHeader } from './section'
+import { Section } from './section'
 
 const STEPS = [
   {
     num: '01',
-    icon: Plug,
-    title: 'Connect your WhatsApp number',
+    title: 'Connect and Configure — No Developer Needed',
     body:
-      'Paste your phone number ID and access token from Meta. Works with any Meta-approved WhatsApp Business API provider.',
+      'Link your WhatsApp number, define your chatbot flows, and set your automation rules — all through a simple visual builder. Most businesses are live within a single afternoon.',
   },
   {
     num: '02',
-    icon: Users,
-    title: 'Bring in your contacts',
+    title: 'Your Business Runs. Conversations Run on Autopilot.',
     body:
-      'Import a CSV, or let incoming messages build your contact list automatically. Tags and custom fields are ready from day one.',
+      'Leads get instant replies. Customers get follow-ups. Broadcasts reach your entire list at once. All of it runs in the background while you focus on actually growing.',
   },
   {
     num: '03',
-    icon: Zap,
-    title: 'Reply, automate, measure',
+    title: "See Exactly What's Making You Money",
     body:
-      'Use the shared inbox with your team, set up flows for repeat work, and track what is actually moving the needle in your analytics.',
+      "Real-time dashboards show open rates, reply rates, conversions, and drop-offs. Know what's working. Double down on it. Kill what isn't. Every week gets better than the last.",
   },
 ]
 
 export function HowItWorks() {
   return (
-    <Section id="how-it-works">
-      <SectionHeader
-        eyebrow="How it works"
-        title="Live in under 30 minutes"
-        description="Most teams are up and running before their first coffee refill. No onboarding calls required."
-      />
+    <Section id="how-it-works" className="relative">
+      {/* Background Glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-blue-600/5 blur-[120px] rounded-full pointer-events-none -z-10" />
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        {STEPS.map((s) => {
-          const Icon = s.icon
-          return (
-            <div
-              key={s.num}
-              className="relative rounded-xl border border-slate-800 bg-slate-900/40 p-6"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <span
-                  className="text-xl font-bold tracking-tight text-slate-800 tabular-nums"
-                  aria-hidden
-                >
-                  {s.num}
+      {/* Section Header */}
+      <div className="text-center max-w-3xl mx-auto mb-16">
+        <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
+          How it works
+        </h2>
+        <p className="mt-4 text-base text-slate-400 leading-relaxed max-w-2xl mx-auto">
+          Getting started with{' '}
+          <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+            MJChatSyncs
+          </span>{' '}
+          takes minutes, not months.
+        </p>
+      </div>
+
+      {/* Steps Grid */}
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-3 max-w-6xl mx-auto">
+        {STEPS.map((s) => (
+          <div
+            key={s.num}
+            className="relative rounded-2xl border border-slate-900 bg-slate-950/40 p-6 sm:p-8 hover:border-slate-850 transition-all duration-300 shadow-lg flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold tracking-widest text-indigo-400 uppercase bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                  Step {s.num}
                 </span>
               </div>
-              <h3 className="mt-4 text-base font-semibold text-white">
+              <h3 className="mt-5 text-base font-bold text-white leading-snug">
                 {s.title}
               </h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
+              <p className="mt-3 text-xs leading-relaxed text-slate-400">
                 {s.body}
               </p>
             </div>
-          )
-        })}
+          </div>
+        ))}
       </div>
     </Section>
   )

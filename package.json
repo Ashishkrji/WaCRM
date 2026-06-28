@@ -4,14 +4,14 @@
   "private": true,
   "description": "Self-hostable CRM template for WhatsApp built on Next.js and Supabase — shared inbox, contacts, sales pipelines, broadcasts, and no-code automations.",
   "license": "MIT",
-  "author": "Arnas Donauskas",
-  "homepage": "https://github.com/Ashishkrji/MJChatSyncs",
+  "author": "AshishKmj",
+  "homepage": "https://github.com/AshishKmj/MJChatSyncs",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Ashishkrji/MJChatSyncs.git"
+    "url": "git+https://github.com/AshishKmj/MJChatSyncs.git"
   },
   "bugs": {
-    "url": "https://github.com/Ashishkrji/MJChatSyncs/issues"
+    "url": "https://github.com/AshishKmj/MJChatSyncs/issues"
   },
   "keywords": [
     "crm",

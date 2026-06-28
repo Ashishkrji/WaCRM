@@ -49,3 +49,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Explicit User Ignores
+.agents
+.next
+.env.local

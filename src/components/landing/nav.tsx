@@ -55,11 +55,11 @@ export function LandingNav() {
       )}
     >
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-6">
-        <Link href="/" className="flex items-center gap-2" aria-label="WaCRM home">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500">
+        <Link href="/" className="flex items-center gap-2" aria-label="MJChatSyncs home">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
             <MessageSquare className="h-4 w-4 text-white" />
           </span>
-          <span className="text-lg font-semibold text-white">WaCRM</span>
+          <span className="text-lg font-semibold text-white">MJChatSyncs</span>
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex">
