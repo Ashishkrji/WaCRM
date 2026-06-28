@@ -22,7 +22,7 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#25D366", // WhatsApp Green
+          background: "#2563eb", // Brand Blue
           borderRadius: 6,
         }}
       >

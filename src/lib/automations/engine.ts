@@ -316,7 +316,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       if (!text.trim()) throw new Error('send_message has empty text')
       const conversationId = await resolveConversationId(args)
       const { whatsapp_message_id } = await engineSendText({
-        organizationId: args.automation.user_id,
+        userId: args.automation.user_id,
         conversationId,
         contactId: args.contactId,
         text,
@@ -348,7 +348,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
             .map((k) => String(cfg.variables![k]))
         : []
       const { whatsapp_message_id } = await engineSendTemplate({
-        organizationId: args.automation.user_id,
+        userId: args.automation.user_id,
         conversationId,
         contactId: args.contactId,
         templateName: cfg.template_name,

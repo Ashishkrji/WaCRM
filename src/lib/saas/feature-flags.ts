@@ -32,7 +32,8 @@ export async function isFeatureEnabled(userId: string, featureKey: string): Prom
     .eq('user_id', userId)
     .single()
 
-  const planCode = (sub?.subscription_plans as Record<string, string>)?.code ?? 'free'
+  const plans = sub?.subscription_plans as any
+  const planCode = (Array.isArray(plans) ? plans[0]?.code : plans?.code) ?? 'free'
   const subStatus = sub?.status ?? 'trial'
 
   // Trial has full access
@@ -69,7 +70,8 @@ export async function getUserFeatures(userId: string): Promise<Record<string, bo
     .eq('user_id', userId)
     .single()
 
-  const planCode = (sub?.subscription_plans as Record<string, string>)?.code ?? 'free'
+  const plans = sub?.subscription_plans as any
+  const planCode = (Array.isArray(plans) ? plans[0]?.code : plans?.code) ?? 'free'
   const isTrialOrActive = sub?.status === 'trial' || sub?.status === 'active'
 
   const result: Record<string, boolean> = {}

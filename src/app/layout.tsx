@@ -1,22 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import Script from "next/script";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { DEFAULT_THEME, STORAGE_KEY, THEME_IDS } from "@/lib/themes";
 
-const inter = Inter({
-  variable: "--font-sans",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
   title: {
-    default: "WaCRM - WhatsApp CRM & Automation Software",
-    template: "%s | WaCRM - WhatsApp CRM",
+    default: "MJChatSyncs - WhatsApp CRM & Automation Software",
+    template: "%s | MJChatSyncs - WhatsApp CRM",
   },
-  description: "WaCRM is a powerful, self-hostable CRM for WhatsApp. Manage your sales pipeline, organize contacts, and automate WhatsApp marketing broadcasts effortlessly.",
+  description: "MJChatSyncs is a powerful, self-hostable CRM for WhatsApp. Manage your sales pipeline, organize contacts, and automate WhatsApp marketing broadcasts effortlessly.",
   robots: {
     index: true,
     follow: true,
@@ -69,14 +63,16 @@ export default function RootLayout({
     <html
       lang="en"
       data-theme={DEFAULT_THEME}
-      className={`${inter.variable} h-full antialiased`}
+      className="h-full antialiased"
       suppressHydrationWarning
     >
-      <body className="min-h-full bg-background text-foreground font-sans" suppressHydrationWarning>
+      <head>
         <script
           id="theme-boot"
           dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }}
         />
+      </head>
+      <body className="min-h-full bg-background text-foreground font-sans" suppressHydrationWarning>
         <ThemeProvider>
           {children}
           <Toaster

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The WaCRM Workflow Engine is a multi-node, graph-based automation system that connects every CRM module: WhatsApp, AI, Leads, Sales, Marketing, Meetings, Tasks, Notifications, Payments, Proposals, Quotations, and Customer Support.
+The MJChatSyncs Workflow Engine is a multi-node, graph-based automation system that connects every CRM module: WhatsApp, AI, Leads, Sales, Marketing, Meetings, Tasks, Notifications, Payments, Proposals, Quotations, and Customer Support.
 
 ## File Structure
 

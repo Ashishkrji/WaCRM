@@ -1,6 +1,6 @@
-# Deployment Guide — WaCRM Enterprise
+# Deployment Guide — MJChatSyncs Enterprise
 
-This document provides step-by-step instructions for deploying WaCRM to production environments.
+This document provides step-by-step instructions for deploying MJChatSyncs to production environments.
 
 ---
 
@@ -49,8 +49,8 @@ sudo apt install -y nginx
 ### Step 2: Clone and Configure App
 ```bash
 # Clone the repository
-git clone https://github.com/Ashishkrji/WaCRM.git /var/www/wacrm
-cd /var/www/wacrm
+git clone https://github.com/Ashishkrji/MJChatSyncs.git /var/www/MJChatSyncs
+cd /var/www/MJChatSyncs
 
 # Copy and edit local environment variables
 cp .env.local.example .env.local
@@ -70,7 +70,7 @@ npm run build
 ### Step 4: Manage Next.js Service via PM2
 ```bash
 # Launch Next.js production server
-pm2 start npm --name "wacrm-prod" -- start
+pm2 start npm --name "MJChatSyncs-prod" -- start
 
 # Configure PM2 to start automatically on system boot
 pm2 save
@@ -80,7 +80,7 @@ pm2 startup
 ### Step 5: Configure Nginx Reverse Proxy
 ```bash
 # Create Nginx site file
-sudo nano /etc/nginx/sites-available/wacrm
+sudo nano /etc/nginx/sites-available/MJChatSyncs
 ```
 Paste the following reverse-proxy template:
 ```nginx
@@ -102,7 +102,7 @@ server {
 ```
 Enable the site and reload Nginx:
 ```bash
-sudo ln -s /etc/nginx/sites-available/wacrm /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/MJChatSyncs /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 ```
@@ -137,7 +137,7 @@ docker compose up -d --build
 ### Step 3: Monitor Logs
 ```bash
 # Inspect container activity logs
-docker compose logs -f wacrm
+docker compose logs -f MJChatSyncs
 ```
 The application will boot up and bind to port `3000` of the host system.
 Proxy public traffic to `http://localhost:3000` using Nginx, Cloudflare Tunnels, or an ALB.
@@ -159,7 +159,7 @@ For the AI memory, logs, prompt templates, and semantic RAG search features, con
 For retrieval augmented generation (RAG) to query relevant chunks using embeddings, you must create a Vector Search Index on the `knowledge_embeddings` collection:
 1. Navigate to **Atlas Search** in your cluster management panel.
 2. Click **Create Search Index** and select **JSON Editor** under **Atlas Vector Search**.
-3. Select the target database name (e.g. `WaCRM`) and `knowledge_embeddings` collection.
+3. Select the target database name (e.g. `MJChatSyncs`) and `knowledge_embeddings` collection.
 4. Paste the following index definition:
    ```json
    {

@@ -458,13 +458,11 @@ function NodeCard({ node, isSelected, onClick, onDelete, onConnect, allNodes }: 
       {/* Connect to another node */}
       {allNodes.length > 1 && (
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              onClick={(e) => e.stopPropagation()}
-              className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-slate-400 hover:border-primary hover:text-primary transition-colors"
-            >
-              <Plus className="h-3 w-3" />
-            </button>
+          <DropdownMenuTrigger
+            onClick={(e) => e.stopPropagation()}
+            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-slate-400 hover:border-primary hover:text-primary transition-colors"
+          >
+            <Plus className="h-3 w-3" />
           </DropdownMenuTrigger>
           <DropdownMenuContent className="border-slate-700 bg-slate-800 text-slate-100 text-xs w-48">
             <p className="px-2 py-1 text-[10px] text-slate-500">Connect to...</p>

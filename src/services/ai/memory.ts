@@ -18,7 +18,18 @@ export async function getContactMemory(
   contactId: string
 ): Promise<ContactMemory | null> {
   try {
-    return await memoryRepo.getContactMemory(userId, contactId)
+    const mem = await memoryRepo.getContactMemory(userId, contactId)
+    if (!mem) return null
+    return {
+      userId: mem.organizationId,
+      contactId: mem.contactId,
+      facts: mem.facts,
+      lastIntent: mem.lastIntent,
+      lastLanguage: mem.lastLanguage,
+      lastSentiment: mem.lastSentiment,
+      totalInteractions: mem.totalInteractions,
+      updatedAt: mem.updatedAt
+    }
   } catch (err) {
     console.error('[AI/memory] getContactMemory failed:', err)
     return null

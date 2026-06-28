@@ -1,12 +1,12 @@
 version: '3.8'
 
 services:
-  wacrm:
+  MJChatSyncs:
     build:
       context: .
       dockerfile: Dockerfile
-    image: wacrm:latest
-    container_name: wacrm-app
+    image: MJChatSyncs:latest
+    container_name: MJChatSyncs-app
     restart: always
     ports:
       - "3000:3000"

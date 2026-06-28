@@ -32,7 +32,7 @@ import { getContactMemory, updateContactMemory, formatMemoryForPrompt, getUnifie
 import { analyzeIntent, quickHumanRequestCheck } from './intent-router'
 import { maybeGenerateSummary } from './summary'
 import { engineSendText } from '@/lib/automations/meta-send'
-import { conversationRepo, messageRepo, aiDataRepo, meetingRepo, quotationRepo, proposalRepo, contactRepo, leadScoreRepo, dealRepo, pipelineRepo } from '@/repositories'
+import { conversationRepo, messageRepo, aiDataRepo, meetingRepo, quotationRepo, proposalRepo, contactRepo, leadScoreRepo, dealRepo, pipelineRepo, aiRouterRepo } from '@/repositories'
 import { logPrompt, logSentimentAnalysis } from './mongodb-logger'
 import { DEFAULT_AGENTS } from './agents/defaults'
 import type { AIDispatchInput, AIDispatchResult, AIMessage } from './types'
@@ -324,12 +324,10 @@ async function evaluateAndCreateLead(
 
     // Save lead score
     await leadScoreRepo.upsertLeadScore(
-      organizationId,
       contactId,
+      organizationId,
       scoring.score,
-      scoring.tier,
-      scoring.reasoning,
-      provider.name
+      scoring.reasoning
     )
 
     // Auto-create deal in pipeline if score is hot or warm (>60)
@@ -392,7 +390,7 @@ async function evaluateAndCreateLead(
 export async function dispatchAIReply(
   input: AIDispatchInput
 ): Promise<AIDispatchResult> {
-  const { organizationId, contactId, conversationId, inboundText, messageType } = input
+  const { userId: organizationId, contactId, conversationId, inboundText, messageType } = input
 
   // Only process text messages (and interactive replies)
   if (messageType && !['text', 'interactive'].includes(messageType)) {
@@ -455,7 +453,7 @@ export async function dispatchAIReply(
     if (!agentConfig || !agentConfig.enabled) {
       const defaultDef = DEFAULT_AGENTS[agentId] || DEFAULT_AGENTS['general']
       agentConfig = {
-        organizationId,
+        userId: organizationId,
         agentId,
         enabled: true,
         name: defaultDef.name,
@@ -670,7 +668,7 @@ export async function dispatchAIReply(
     // ─────────────────────────────────────────────────────────
     try {
       await engineSendText({
-        organizationId,
+        userId: organizationId,
         conversationId,
         contactId,
         text: replyText,
@@ -809,7 +807,7 @@ async function handleHumanHandoff(args: {
     if (contact) {
       try {
         await engineSendText({
-          organizationId,
+          userId: organizationId,
           conversationId,
           contactId: contact.contactId,
           text: handoffMessage,

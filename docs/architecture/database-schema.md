@@ -1,6 +1,6 @@
 # Database Schema Book
 
-WaCRM utilizes a dual-database architecture:
+MJChatSyncs utilizes a dual-database architecture:
 1. **Supabase (PostgreSQL)** for structured relational data, transactions, and RBAC.
 2. **MongoDB Atlas** for unstructured data, high-volume logs, AI Memory, and Vector Search (RAG).
 

@@ -1,4 +1,4 @@
-# WaCRM UX Design System
+# MJChatSyncs UX Design System
 
 ## 1. Design Tokens
 

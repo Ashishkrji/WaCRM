@@ -1,4 +1,4 @@
-# Testing & Verification Guide — WaCRM Enterprise
+# Testing & Verification Guide — MJChatSyncs Enterprise
 
 This document describes how to verify the CRM's automated features and manually validate the integrations.
 

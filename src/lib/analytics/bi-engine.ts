@@ -392,12 +392,12 @@ export async function forecastMetric(
 ): Promise<Array<{ date: string; value: number; is_forecast: boolean }>> {
   const db = supabaseAdmin()
 
-  const { data: snapshots } = await db
+  const { data: snapshots } = (await db
     .from('analytics_snapshots')
     .select(`snapshot_date, ${metric as string}`)
     .eq('user_id', userId)
     .order('snapshot_date', { ascending: true })
-    .limit(90)
+    .limit(90)) as { data: any[] | null; error: any }
 
   if (!snapshots || snapshots.length < 7) return []
 

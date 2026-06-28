@@ -1,9 +1,9 @@
 # SaaS Product Documentation & Roadmap
 
-This document outlines how WaCRM will transition from a single-business tool to a full-fledged B2B SaaS platform. Every feature built must respect these future constraints so that the migration requires zero structural rewrites.
+This document outlines how MJChatSyncs will transition from a single-business tool to a full-fledged B2B SaaS platform. Every feature built must respect these future constraints so that the migration requires zero structural rewrites.
 
 ## 1. Multi-Tenant Isolation Strategy
-- **Row Level Security (RLS)**: WaCRM utilizes logical separation rather than separate databases. Every core table in Supabase MUST contain an `organization_id`. RLS policies ensure that users can only query data matching their active `organization_id`.
+- **Row Level Security (RLS)**: MJChatSyncs utilizes logical separation rather than separate databases. Every core table in Supabase MUST contain an `organization_id`. RLS policies ensure that users can only query data matching their active `organization_id`.
 - **MongoDB**: Every MongoDB document MUST include an `organization_id` property. Queries will always apply an `{ organization_id: currentOrg }` filter at the service layer.
 
 ## 2. Feature Flags & Licensing

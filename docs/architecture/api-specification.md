@@ -1,6 +1,6 @@
 # API Specification
 
-All WaCRM internal APIs are built using Next.js App Router API Routes (`app/api/...`).
+All MJChatSyncs internal APIs are built using Next.js App Router API Routes (`app/api/...`).
 They follow strict RESTful conventions and return standard JSON responses.
 
 ## 1. Global Request & Response Format

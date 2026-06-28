@@ -776,7 +776,7 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
       .find({ user_id: organizationId })
       .toArray();
     return docs.map(doc => ({
-      organizationId: doc.user_id,
+      userId: doc.user_id,
       agentId: doc.agent_id,
       enabled: doc.enabled,
       name: doc.name,
@@ -796,7 +796,7 @@ export class MongoAIDataServiceProvider implements AIDataServiceProvider {
     const doc = await db.collection('ai_agent_configs').findOne({ user_id: organizationId, agent_id: agentId });
     if (!doc) return null;
     return {
-      organizationId: doc.user_id,
+      userId: doc.user_id,
       agentId: doc.agent_id,
       enabled: doc.enabled,
       name: doc.name,

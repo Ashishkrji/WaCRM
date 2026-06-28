@@ -2,7 +2,7 @@
 
 ## Overview
 
-The WaCRM BI Platform provides a full-stack analytics engine with daily KPI snapshots, AI-generated insights, anomaly detection, multi-module analytics, and CSV/JSON report exports.
+The MJChatSyncs BI Platform provides a full-stack analytics engine with daily KPI snapshots, AI-generated insights, anomaly detection, multi-module analytics, and CSV/JSON report exports.
 
 ## File Structure
 

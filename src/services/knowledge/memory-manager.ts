@@ -47,7 +47,13 @@ export async function loadContactContext(contactId: string, userId: string): Pro
     email: contactRes.data?.email ?? null,
     memories: (memoriesRes.data ?? []) as MemoryItem[],
     recentSummary: summaryRes.data?.summary ?? null,
-    tags: ((tagsRes.data ?? []) as Array<{ tags: { name: string } }>).map(t => t.tags?.name ?? '').filter(Boolean),
+    tags: ((tagsRes.data ?? []) as any[]).map(t => {
+      const tagObj = t.tags
+      if (Array.isArray(tagObj)) {
+        return tagObj[0]?.name ?? ''
+      }
+      return (tagObj as any)?.name ?? ''
+    }).filter(Boolean),
   }
 }
 

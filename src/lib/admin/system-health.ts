@@ -88,11 +88,18 @@ async function getMetrics() {
   const todayStart = new Date()
   todayStart.setHours(0, 0, 0, 0)
 
-  const [{ count: convCount }, { count: userCount }, { count: aiCount }] = await Promise.all([
+  const [{ count: convCount }, { count: userCount }] = await Promise.all([
     db.from('conversations').select('id', { count: 'exact', head: true }).eq('status', 'open'),
     db.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-    db.from('ai_usage_logs').select('id', { count: 'exact', head: true }).gte('created_at', todayStart.toISOString()).catch(() => ({ count: 0 })),
   ])
+
+  let aiCount = 0
+  try {
+    const { count } = await db.from('ai_usage_logs').select('id', { count: 'exact', head: true }).gte('created_at', todayStart.toISOString())
+    aiCount = count ?? 0
+  } catch (e) {
+    // ignore
+  }
 
   return {
     active_conversations: convCount ?? 0,
@@ -124,13 +131,17 @@ export async function getSystemHealth(): Promise<SystemHealthReport> {
 
   // Save snapshot
   const db = supabaseAdmin()
-  await db.from('system_health_snapshots').insert({
-    db_status: dbHealth.status,
-    db_latency_ms: dbHealth.latency_ms,
-    ai_status: aiHealth.status,
-    ai_latency_ms: aiHealth.latency_ms,
-    whatsapp_status: waHealth.status,
-  }).catch(() => {})
+  try {
+    await db.from('system_health_snapshots').insert({
+      db_status: dbHealth.status,
+      db_latency_ms: dbHealth.latency_ms,
+      ai_status: aiHealth.status,
+      ai_latency_ms: aiHealth.latency_ms,
+      whatsapp_status: waHealth.status,
+    })
+  } catch (e) {
+    // ignore
+  }
 
   return report
 }

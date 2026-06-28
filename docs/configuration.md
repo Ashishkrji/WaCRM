@@ -1,6 +1,6 @@
-# Configuration & Tuning Guide — WaCRM Enterprise
+# Configuration & Tuning Guide — MJChatSyncs Enterprise
 
-This guide covers the environment variables, template placeholders, and tuning options available in WaCRM Enterprise.
+This guide covers the environment variables, template placeholders, and tuning options available in MJChatSyncs Enterprise.
 
 ---
 
@@ -13,7 +13,7 @@ Here is a checklist of all variables you can configure in `.env.local` to contro
 *   `NEXT_PUBLIC_SUPABASE_ANON_KEY`: The public anonymous key for client-side API operations.
 *   `SUPABASE_SERVICE_ROLE_KEY`: The server-side service role key (bypasses RLS to allow webhook writes).
 *   `MONGODB_URI`: The connection string to your MongoDB Atlas cluster (e.g. `mongodb+srv://<user>:<password>@cluster.mongodb.net/?retryWrites=true&w=majority`).
-*   `MONGODB_DB_NAME`: The target MongoDB database name (defaults to `wacrm`).
+*   `MONGODB_DB_NAME`: The target MongoDB database name (defaults to `MJChatSyncs`).
 
 
 ### Security Configuration

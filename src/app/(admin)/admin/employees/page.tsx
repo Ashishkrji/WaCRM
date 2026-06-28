@@ -1,3 +1,5 @@
+"use client";
+
 import PlaceholderPage from "../_components/placeholder"
 import { UserCheck } from "lucide-react"
 

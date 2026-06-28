@@ -1,4 +1,4 @@
-# 📱 WaCRM — Premium Self-Hostable WhatsApp® CRM & Marketing Automation
+# 📱 MJChatSyncs — Premium Self-Hostable WhatsApp® CRM & Marketing Automation
 
 > **Fork it, brand it, host it, own it.**  
 > A premium, fully self-hostable, production-ready WhatsApp® Business API CRM. Featuring a multi-agent shared inbox, automated contact segmentation, multi-stage sales pipelines, broadcast messaging, visual no-code automations, AI chatbot/router integration, and dynamic website chat widgets. **Zero seat limits, zero subscription fees.**
@@ -14,11 +14,11 @@
 
 ## 🌟 Premium Features Overview
 
-WaCRM is built to bypass expensive per-seat SaaS fees, providing you with a high-end customer management system.
+MJChatSyncs is built to bypass expensive per-seat SaaS fees, providing you with a high-end customer management system.
 
 ```mermaid
 graph TD
-    A[WhatsApp Business Cloud API] -->|Webhooks| B(WaCRM Server Engine)
+    A[WhatsApp Business Cloud API] -->|Webhooks| B(MJChatSyncs Server Engine)
     B -->|Live Realtime Sync| C(Multi-Agent Shared Inbox)
     B -->|Fallback Redundancy| D[Supabase Cloud Database]
     B -->|Automatic Offline Bypass| E[Local Browser Cache / localStorage]
@@ -73,10 +73,10 @@ graph TD
 
 ## 🛠️ Codebase Tour & Directory Structure
 
-Understanding the layout of WaCRM allows you to modify the layout or add custom modules:
+Understanding the layout of MJChatSyncs allows you to modify the layout or add custom modules:
 
 ```text
-wacrm-main/
+MJChatSyncs-main/
 ├── src/
 │   ├── app/                      # Next.js App Router Pages & API Routes
 │   │   ├── (auth)/               # Login, Signup, Reset Password pages
@@ -105,7 +105,7 @@ wacrm-main/
 
 ## 🚀 Step-by-Step Developer Build Guide
 
-Follow this guide to clone, customize, build, and deploy your personal copy of WaCRM.
+Follow this guide to clone, customize, build, and deploy your personal copy of MJChatSyncs.
 
 ### 📋 1. Prerequisites
 Before beginning, make sure you have:
@@ -121,8 +121,8 @@ Before beginning, make sure you have:
 #### Step A: Clone the Repository
 Open a terminal and clone your repository fork:
 ```bash
-git clone https://github.com/<your-username>/wacrm.git
-cd wacrm
+git clone https://github.com/<your-username>/MJChatSyncs.git
+cd MJChatSyncs
 ```
 
 #### Step B: Install dependencies
@@ -202,7 +202,7 @@ If you prefer to bypass the CLI:
 
 ### 📱 4. WhatsApp Cloud API Connection Setup
 
-To link your physical WhatsApp Business Number or a Meta Sandbox testing line with the WaCRM dashboard, follow these steps:
+To link your physical WhatsApp Business Number or a Meta Sandbox testing line with the MJChatSyncs dashboard, follow these steps:
 
 #### Step A: Create your Facebook Developer App
 1.  Log in to [Meta Developers Console](https://developers.facebook.com/).
@@ -218,8 +218,8 @@ By default, the token in the Meta Developers console expires every 24 hours. To 
 4.  Click **Generate New Token**, select your app, check the **`whatsapp_business_messaging`** and **`whatsapp_business_management`** permission checkboxes, and click **Generate**.
 5.  Copy this token and store it securely. **This token will never expire.**
 
-#### Step C: Connect and Test inside WaCRM
-1.  Log into your WaCRM panel and navigate to **Settings > WhatsApp Configuration**.
+#### Step C: Connect and Test inside MJChatSyncs
+1.  Log into your MJChatSyncs panel and navigate to **Settings > WhatsApp Configuration**.
 2.  Click **Connect WhatsApp Number**.
 3.  Input your details:
     *   **Phone Number ID**: Found in Meta Developer console (WhatsApp > API Setup).
@@ -234,8 +234,8 @@ To receive live customer chats in your CRM inbox:
 2.  Under **Webhook**, click **Edit**.
 3.  Set the fields:
     *   **Callback URL**: `https://your-public-domain.com/api/whatsapp/webhook`
-    *   **Verify Token**: Set a custom secure string of your choosing (e.g. `MySecureWaCrmToken123!`).
-4.  Copy this verification token string, go back to your WaCRM Settings dashboard under the **Webhook Verification Token** panel, paste it, and save.
+    *   **Verify Token**: Set a custom secure string of your choosing (e.g. `MySecureMJChatSyncsToken123!`).
+4.  Copy this verification token string, go back to your MJChatSyncs Settings dashboard under the **Webhook Verification Token** panel, paste it, and save.
 5.  On the Meta Developers page, scroll to **Webhook Fields**, click **Manage**, find the **`messages`** row, and click **Subscribe**.
 6.  Send a WhatsApp text from a separate phone to your registered Business API number. The message will appear in your live CRM shared inbox instantly!
 
@@ -276,8 +276,8 @@ For high-performance self-hosting on Ubuntu or Debian servers:
     ```
 2.  Clone your project and create your production env file:
     ```bash
-    git clone https://github.com/<your-username>/wacrm.git /var/www/wacrm
-    cd /var/www/wacrm
+    git clone https://github.com/<your-username>/MJChatSyncs.git /var/www/MJChatSyncs
+    cd /var/www/MJChatSyncs
     cp .env.local.example .env.local
     # Edit the file to add credentials
     nano .env.local
@@ -289,13 +289,13 @@ For high-performance self-hosting on Ubuntu or Debian servers:
     ```
 4.  Launch the application using PM2:
     ```bash
-    pm2 start npm --name "wacrm" -- start
+    pm2 start npm --name "MJChatSyncs" -- start
     pm2 save
     pm2 startup
     ```
 5.  Configure Nginx as a reverse proxy:
     ```bash
-    sudo nano /etc/nginx/sites-available/wacrm
+    sudo nano /etc/nginx/sites-available/MJChatSyncs
     ```
     Paste this configuration block:
     ```nginx
@@ -317,7 +317,7 @@ For high-performance self-hosting on Ubuntu or Debian servers:
     ```
 6.  Enable the Nginx config, test syntax, and restart:
     ```bash
-    sudo ln -s /etc/nginx/sites-available/wacrm /etc/nginx/sites-enabled/
+    sudo ln -s /etc/nginx/sites-available/MJChatSyncs /etc/nginx/sites-enabled/
     sudo nginx -t
     sudo systemctl restart nginx
     ```
@@ -326,7 +326,7 @@ For high-performance self-hosting on Ubuntu or Debian servers:
 
 ## 🛡️ Database Tables & Schema Overview
 
-To help you custom-build features on top of WaCRM, here is a breakdown of the primary database tables created during migrations:
+To help you custom-build features on top of MJChatSyncs, here is a breakdown of the primary database tables created during migrations:
 
 | Table Name | Primary Purpose | Key Fields |
 | :--- | :--- | :--- |
@@ -350,4 +350,4 @@ To help you custom-build features on top of WaCRM, here is a breakdown of the pr
 
 ## 📄 License
 
-This software is released under the terms of the [MIT License](./LICENSE). Feel free to fork, white-label, re-brand, commercialize, or build custom plugins on top of WaCRM!
+This software is released under the terms of the [MIT License](./LICENSE). Feel free to fork, white-label, re-brand, commercialize, or build custom plugins on top of MJChatSyncs!

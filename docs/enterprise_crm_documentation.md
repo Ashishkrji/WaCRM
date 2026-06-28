@@ -1,6 +1,6 @@
-# Enterprise CRM Module Documentation — WaCRM
+# Enterprise CRM Module Documentation — MJChatSyncs
 
-This comprehensive reference manual documents the design, data flows, permission configurations, database architecture, and extension interfaces for the WaCRM Enterprise CRM modules.
+This comprehensive reference manual documents the design, data flows, permission configurations, database architecture, and extension interfaces for the MJChatSyncs Enterprise CRM modules.
 
 ---
 
@@ -138,7 +138,7 @@ graph TD
 ---
 
 ## 6. Permission Matrix
-WaCRM utilizes Role-Based Access Control (RBAC) to define what pages, controls, and fields team members can view or modify. Below is the default system configuration matrix:
+MJChatSyncs utilizes Role-Based Access Control (RBAC) to define what pages, controls, and fields team members can view or modify. Below is the default system configuration matrix:
 
 | CRM Module / Action | Super Admin | Admin | Manager | Sales Executive | Support Executive | Marketing | Accountant |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |

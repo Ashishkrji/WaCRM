@@ -4,7 +4,7 @@ set -e
 echo "Starting Deployment Process..."
 
 # Navigate to project directory
-cd /var/www/wacrm
+cd /var/www/MJChatSyncs
 
 # Pull latest changes
 echo "Pulling latest changes from main branch..."

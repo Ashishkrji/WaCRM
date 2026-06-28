@@ -9,7 +9,7 @@
  *   - Website content (fetched as text)
  */
 
-import { knowledgeRepo } from '@/repositories'
+import { knowledgeRepo, aiDataRepo } from '@/repositories'
 import { generateEmbedding } from './embeddings'
 
 // ============================================================
@@ -168,7 +168,7 @@ export async function ingestText(options: IngestOptions): Promise<number> {
 export async function fetchWebsiteContent(url: string): Promise<string> {
   const res = await fetch(url, {
     headers: {
-      'User-Agent': 'WaCRM-KnowledgeBot/1.0 (+https://wacrm.tech)',
+      'User-Agent': 'MJChatSyncs-KnowledgeBot/1.0 (+https://MJChatSyncs.tech)',
       Accept: 'text/html,text/plain',
     },
     signal: AbortSignal.timeout(15_000),
@@ -256,7 +256,7 @@ export async function crawlWebsite(
       console.log(`[Crawler] Fetching: ${urlToFetch} at depth ${current.depth}`)
       const res = await fetch(urlToFetch, {
         headers: {
-          'User-Agent': 'WaCRM-KnowledgeBot/1.0 (+https://wacrm.tech)',
+          'User-Agent': 'MJChatSyncs-KnowledgeBot/1.0 (+https://MJChatSyncs.tech)',
           Accept: 'text/html,text/plain',
         },
         signal: AbortSignal.timeout(10_000),

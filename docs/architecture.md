@@ -1,12 +1,12 @@
-# System Architecture — WaCRM Enterprise
+# System Architecture — MJChatSyncs Enterprise
 
-This document describes the high-level architecture, database schemas, and message execution flows of WaCRM Enterprise.
+This document describes the high-level architecture, database schemas, and message execution flows of MJChatSyncs Enterprise.
 
 ---
 
 ## 🌐 High-Level System Architecture
 
-WaCRM operates as a Next.js App Router application hosted on a server or VPS (e.g. Hostinger, Vercel, or a Docker container) linked to a Supabase Postgres database.
+MJChatSyncs operates as a Next.js App Router application hosted on a server or VPS (e.g. Hostinger, Vercel, or a Docker container) linked to a Supabase Postgres database.
 
 ```
                   ┌──────────────────────────────┐
@@ -17,7 +17,7 @@ WaCRM operates as a Next.js App Router application hosted on a server or VPS (e.
                                  │
                                  ▼
          ┌────────────────────────────────────────────────┐
-         │             WaCRM Webhook Receiver             │
+         │             MJChatSyncs Webhook Receiver             │
          │   (src/app/api/whatsapp/webhook/route.ts)      │
          └──────────────┬──────────────────┬──────────────┘
                         │                  │
@@ -95,7 +95,7 @@ sequenceDiagram
 
 ## 🗄️ Database Schema & Relationships
 
-WaCRM leverages Supabase PostgreSQL with `pgvector` enabled for semantic embeddings. Row-Level Security (RLS) restricts access to tenant workspaces (`business_workspaces` table).
+MJChatSyncs leverages Supabase PostgreSQL with `pgvector` enabled for semantic embeddings. Row-Level Security (RLS) restricts access to tenant workspaces (`business_workspaces` table).
 
 ```mermaid
 erDiagram

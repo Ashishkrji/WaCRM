@@ -5,6 +5,7 @@
 
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { searchKnowledge, generateEmbedding } from './embeddings'
+import { knowledgeRepo } from '@/repositories'
 
 export interface KBSearchResult {
   id: string
@@ -16,6 +17,33 @@ export interface KBSearchResult {
   article_type: string
   score: number
   source: 'vector' | 'fulltext'
+}
+
+// ─────────────────────────────────────────────
+// Vector Search Helper
+// ─────────────────────────────────────────────
+
+async function vectorSearch(
+  query: string,
+  userId: string,
+  limit: number
+): Promise<Array<{ article_id: string; title: string; excerpt: string; tags: string[]; score: number }>> {
+  try {
+    const embedding = await generateEmbedding(query)
+    if (!embedding || embedding.length === 0) return []
+
+    const results = await knowledgeRepo.hybridSearchKnowledge(userId, embedding, query, {}, limit)
+    return results.map(r => ({
+      article_id: r.knowledge_base_id,
+      title: '',
+      excerpt: '',
+      tags: r.tags || [],
+      score: r.similarity,
+    }))
+  } catch (err) {
+    console.error('[kb] vectorSearch helper failed:', err)
+    return []
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -103,8 +131,8 @@ export async function indexArticle(articleId: string, userId: string): Promise<v
 
   try {
     const embedding = await generateEmbedding(`${article.title}\n\n${article.content}`)
-    const mongoId = await storeArticleEmbedding({
-      article_id: articleId,
+    const row = {
+      knowledge_base_id: articleId,
       user_id: userId,
       title: article.title,
       content: article.content,
@@ -112,13 +140,14 @@ export async function indexArticle(articleId: string, userId: string): Promise<v
       tags: article.tags ?? [],
       category: cat?.name ?? '',
       embedding,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
+      created_at: new Date(),
+      updated_at: new Date(),
+    }
+    await knowledgeRepo.insertKnowledgeEmbeddings([row])
 
     await db
       .from('knowledge_articles')
-      .update({ embedding_id: mongoId ?? '', embedding_synced_at: new Date().toISOString() })
+      .update({ embedding_id: 'synced', embedding_synced_at: new Date().toISOString() })
       .eq('id', articleId)
   } catch (err) {
     console.error('[kb] indexing failed:', err)
@@ -151,11 +180,17 @@ export async function logSearch(params: {
 
   // Increment search hit count on top article
   if (topResult?.id) {
-    await db.rpc('increment_kb_search_hit', { article_id: topResult.id }).catch(() => {
-      db.from('knowledge_articles')
-        .update({ search_hit_count: db.sql`search_hit_count + 1` as never })
+    try {
+      const { error } = await db.rpc('increment_kb_search_hit', { article_id: topResult.id })
+      if (error) throw error
+    } catch {
+      // Fallback: Fetch current value and increment
+      const { data } = await db.from('knowledge_articles').select('search_hit_count').eq('id', topResult.id).single()
+      const currentCount = data?.search_hit_count ?? 0
+      await db.from('knowledge_articles')
+        .update({ search_hit_count: currentCount + 1 })
         .eq('id', topResult.id)
-    })
+    }
   }
 }
 

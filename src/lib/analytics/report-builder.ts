@@ -106,7 +106,7 @@ async function fetchReportData(report: BiReport, userId: string): Promise<unknow
         .select((config.columns ?? ['*']).join(','))
         .eq('user_id', userId)
         .order('snapshot_date', { ascending: false })
-        .limit(config.limit ?? 100)
+        .limit(config.limit ?? 100) as any
 
       if (config.date_range && 'from' in config.date_range) {
         query = query.gte('snapshot_date', config.date_range.from)

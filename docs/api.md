@@ -1,4 +1,4 @@
-# API Reference Manual — WaCRM Enterprise
+# API Reference Manual — MJChatSyncs Enterprise
 
 This document lists the serverless REST API endpoints for the AI engine, knowledge-base indexing, and public signature portals.
 
