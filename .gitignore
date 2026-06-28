@@ -11,14 +11,7 @@
 !.yarn/versions
 
 # testing
-/coverage
-
-# docs
-/.agents
-/ e2e
-/ infrastructure
-/ k6
-/ docs 
+/coverage 
 
 # next.js
 /.next/
