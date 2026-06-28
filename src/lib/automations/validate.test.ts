@@ -212,6 +212,12 @@ describe("validateTriggerForActivation", () => {
     expect(issues.map((i) => i.path)).toContain("trigger.match_type");
   });
 
+  it("accepts keyword_match with a missing match_type (defaults to contains)", () => {
+    expect(
+      validateTriggerForActivation("keyword_match", { keywords: ["hi"] }),
+    ).toEqual([]);
+  });
+
   it("requires schedule on time_based triggers", () => {
     expect(validateTriggerForActivation("time_based", {})).toEqual([
       { path: "trigger.schedule", message: "schedule is required" },

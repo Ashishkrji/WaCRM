@@ -27,6 +27,32 @@ export const DEFAULT_THEME: ThemeId = "whatsapp";
 
 export const STORAGE_KEY = "wacrm.theme";
 
+/**
+ * MODE — the light/dark dimension, orthogonal to the accent theme.
+ *
+ * The CSS variables live in `src/app/globals.css` under
+ * `html[data-mode="..."]` blocks (neutral surfaces only). Applied
+ * at runtime via `document.documentElement.dataset.mode`. Dark is
+ * the historical default and stays the app's identity; light is the
+ * opt-in eye-strain-friendly alternative.
+ *
+ * Persisted under its own localStorage key so it composes freely
+ * with the accent choice (you can run Violet-light or Violet-dark).
+ */
+export const MODES = ["light", "dark"] as const;
+
+export type Mode = (typeof MODES)[number];
+
+export const DEFAULT_MODE: Mode = "dark";
+
+export const MODE_STORAGE_KEY = "wacrm.mode";
+
+export function isMode(value: unknown): value is Mode {
+  return (
+    typeof value === "string" && (MODES as ReadonlyArray<string>).includes(value)
+  );
+}
+
 export interface ThemeMeta {
   id: ThemeId;
   name: string;

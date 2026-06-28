@@ -1,50 +1,120 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check, Moon, Palette, SunMoon, Sun } from "lucide-react";
 
 import { useTheme } from "@/hooks/use-theme";
-import { THEMES, type ThemeId } from "@/lib/themes";
+import { MODES, THEMES, type Mode, type ThemeId } from "@/lib/themes";
 import { cn } from "@/lib/utils";
+import { SettingsPanelHead } from "./settings-panel-head";
 
 /**
- * Appearance panel — color-theme picker.
+ * Appearance panel — light/dark mode + accent-color picker.
  *
- * Click a card → applies + persists immediately. No save button:
- * the whole change is a single CSS-variable swap on <html>, there's
- * nothing to roll back. The active card carries a check chip + a
- * primary-tinted border so the current pick is obvious.
+ * Two independent controls: a mode toggle (light / dark) and the
+ * accent grid. Either applies + persists immediately. No save button:
+ * each change is a single attribute swap on <html>, there's nothing
+ * to roll back.
  *
  * Persistence: localStorage only (device-scoped). The boot script in
- * layout.tsx replays the choice before first paint on subsequent
+ * layout.tsx replays both choices before first paint on subsequent
  * loads.
  */
 export function AppearancePanel() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, mode, setMode } = useTheme();
   return (
-    <section className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-white">Color theme</h2>
-        <p className="mt-1 text-sm text-slate-400">
-          Pick the accent color used across the app. All themes stay
-          dark — only the primary color (buttons, active nav, badges)
-          changes. Saved to this device.
-        </p>
+    <section className="max-w-3xl animate-in fade-in-50 duration-200">
+      <SettingsPanelHead
+        title="Appearance"
+        description="Set the mode and accent colour used across the app. Saved to this device — try it, it changes live."
+      />
+
+      <div className="space-y-4">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <SunMoon className="size-4 text-muted-foreground" />
+          Mode
+        </h3>
+
+        <div
+          role="radiogroup"
+          aria-label="Color mode"
+          className="grid max-w-md grid-cols-2 gap-3"
+        >
+          {MODES.map((m) => (
+            <ModeCard
+              key={m}
+              mode={m}
+              isActive={m === mode}
+              onPick={() => setMode(m)}
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {THEMES.map((t) => (
-          <ThemeCard
-            key={t.id}
-            id={t.id}
-            name={t.name}
-            tagline={t.tagline}
-            swatch={t.swatch}
-            isActive={t.id === theme}
-            onPick={() => setTheme(t.id)}
-          />
-        ))}
+      <div className="mt-8 space-y-4">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Palette className="size-4 text-muted-foreground" />
+          Accent color
+        </h3>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {THEMES.map((t) => (
+            <ThemeCard
+              key={t.id}
+              id={t.id}
+              name={t.name}
+              tagline={t.tagline}
+              swatch={t.swatch}
+              isActive={t.id === theme}
+              onPick={() => setTheme(t.id)}
+            />
+          ))}
+        </div>
       </div>
     </section>
+  );
+}
+
+function ModeCard({
+  mode,
+  isActive,
+  onPick,
+}: {
+  mode: Mode;
+  isActive: boolean;
+  onPick: () => void;
+}) {
+  const isLight = mode === "light";
+  const Icon = isLight ? Sun : Moon;
+  return (
+    <button
+      type="button"
+      role="radio"
+      onClick={onPick}
+      aria-checked={isActive}
+      aria-label={`Use ${mode} mode`}
+      className={cn(
+        "flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-colors",
+        isActive
+          ? "border-primary/60 ring-2 ring-primary/40"
+          : "border-border hover:border-border hover:bg-muted/40",
+      )}
+    >
+      <span
+        aria-hidden
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground"
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="flex-1 text-sm font-semibold capitalize text-foreground">
+        {mode}
+      </span>
+      {isActive && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
+          <Check className="h-3 w-3" />
+          Active
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -73,7 +143,7 @@ function ThemeCard({
         "flex flex-col gap-3 rounded-lg border bg-card p-4 text-left transition-colors",
         isActive
           ? "border-primary/60 ring-2 ring-primary/40"
-          : "border-slate-800 hover:border-slate-700 hover:bg-slate-800/40",
+          : "border-border hover:border-border hover:bg-muted/40",
       )}
     >
       <div className="flex items-center justify-between">
@@ -93,8 +163,8 @@ function ThemeCard({
         )}
       </div>
       <div>
-        <div className="text-sm font-semibold text-white">{name}</div>
-        <div className="mt-1 text-xs leading-relaxed text-slate-400">
+        <div className="text-sm font-semibold text-foreground">{name}</div>
+        <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
           {tagline}
         </div>
       </div>
@@ -103,9 +173,9 @@ function ThemeCard({
         aria-hidden
       >
         <span className="flex-1" style={{ background: swatch }} />
-        <span className="w-3 bg-slate-700" />
-        <span className="w-3 bg-slate-800" />
-        <span className="w-3 bg-slate-900" />
+        <span className="w-3 bg-muted-foreground/60" />
+        <span className="w-3 bg-muted" />
+        <span className="w-3 bg-card" />
       </div>
       <span className="sr-only">Theme id: {id}</span>
     </button>

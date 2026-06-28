@@ -1,92 +1,84 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { User, Settings } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
+
+import { useAuth } from '@/hooks/use-auth';
+import { useTheme } from '@/hooks/use-theme';
+import { SettingsRail } from '@/components/settings/settings-rail';
+import { SettingsOverview } from '@/components/settings/settings-overview';
 import { ProfileForm } from '@/components/settings/profile-form';
-import { PasswordForm } from '@/components/settings/password-form';
-import { SessionsCard } from '@/components/settings/sessions-card';
-
-const TAB_VALUES = [
-  'profile',
-  'whatsapp',
-] as const;
-type TabValue = (typeof TAB_VALUES)[number];
-
-function isTabValue(v: string | null): v is TabValue {
-  return !!v && (TAB_VALUES as readonly string[]).includes(v);
-}
+import { SecurityPanel } from '@/components/settings/security-panel';
+import { AppearancePanel } from '@/components/settings/appearance-panel';
+import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
+import { TemplateManager } from '@/components/settings/template-manager';
+import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel';
+import { DealsSettings } from '@/components/settings/deals-settings';
+import { MembersTab } from '@/components/settings/members-tab';
+import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
+import {
+  resolveSection,
+  type SettingsSection,
+} from '@/components/settings/settings-sections';
 
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { defaultCurrency } = useAuth();
+  const { mode } = useTheme();
 
-  const queryTab = searchParams.get('tab');
-  const tab: TabValue = isTabValue(queryTab) ? queryTab : 'profile';
+  // The URL (`?tab=`) is the single source of truth for the active
+  // section — deep-linkable, and it keeps the existing links in the
+  // app sidebar/header working. Legacy tab values (tags, custom-fields)
+  // resolve onto their new home; unknown/empty → the Overview landing.
+  const section = resolveSection(searchParams.get('tab'));
 
-  useEffect(() => {
-    if (queryTab === 'workspace') {
-      router.replace('/workspace');
-    } else if (queryTab === 'templates') {
-      router.replace('/templates');
-    } else if (queryTab === 'tags') {
-      router.replace('/tags');
-    } else if (queryTab === 'pipelines') {
-      router.replace('/pipeline-manager');
-    } else if (queryTab === 'integrations') {
-      router.replace('/integrations');
-    } else if (queryTab === 'appearance') {
-      router.replace('/appearance');
-    } else if (queryTab === 'team') {
-      router.replace('/team');
-    }
-  }, [queryTab, router]);
-
-  const onChange = (next: TabValue) => {
+  const go = (next: SettingsSection) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', next);
     router.replace(`/settings?${params.toString()}`, { scroll: false });
   };
 
+  // Cheap, fetch-free rail hints. The Overview landing carries the
+  // full live status/counts; the rail just surfaces the two that are
+  // already in context.
+  const hints: Partial<Record<SettingsSection, ReactNode>> = useMemo(
+    () => ({
+      appearance: mode.charAt(0).toUpperCase() + mode.slice(1),
+      deals: defaultCurrency,
+    }),
+    [mode, defaultCurrency],
+  );
+
+  const panel: Record<SettingsSection, ReactNode> = {
+    overview: <SettingsOverview onSelect={go} />,
+    profile: <ProfileForm />,
+    security: <SecurityPanel />,
+    appearance: <AppearancePanel />,
+    whatsapp: <WhatsAppConfig />,
+    templates: <TemplateManager />,
+    fields: <FieldsAndTagsPanel />,
+    deals: <DealsSettings />,
+    members: <MembersTab />,
+    api: <ApiKeysSettings />,
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Settings</h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Manage your account profile details and WhatsApp® configurations.
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          Settings
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Everything in one place — your account and your workspace. Pick a
+          section to manage it.
         </p>
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => onChange(v as TabValue)}>
-        <TabsList className="bg-slate-900 border border-slate-700">
-          <TabsTrigger
-            value="profile"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
-          >
-            <User className="size-4" />
-            Profile
-          </TabsTrigger>
-          <TabsTrigger
-            value="whatsapp"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
-          >
-            <Settings className="size-4" />
-            WhatsApp Config
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="profile" className="space-y-6">
-          <ProfileForm />
-          <PasswordForm />
-          <SessionsCard />
-        </TabsContent>
-
-        <TabsContent value="whatsapp">
-          <WhatsAppConfig />
-        </TabsContent>
-      </Tabs>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[236px_minmax(0,1fr)] lg:items-start">
+        <SettingsRail active={section} onSelect={go} hints={hints} />
+        <div className="min-w-0">{panel[section]}</div>
+      </div>
     </div>
   );
 }

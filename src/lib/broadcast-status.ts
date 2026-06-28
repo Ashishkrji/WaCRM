@@ -5,7 +5,10 @@
  * /broadcasts/page.tsx and /broadcasts/[id]/page.tsx with slight
  * drift risk. One source of truth now.
  *
- * Dark-theme only — bg-*-500/10 + text-*-400 + border-*-500/20.
+ * Badge shape: bg-*-500/10 + text-*-400 + border-*-500/20. The
+ * translucent fills sit fine on both light and dark surfaces; neutral
+ * statuses use text-muted-foreground so the label stays legible in
+ * light mode (a solid slate-400 would be too faint on white).
  */
 
 import type { BroadcastStatus, RecipientStatus } from "@/types";
@@ -23,7 +26,7 @@ export interface StatusDisplay {
 export const broadcastStatusConfig: Record<BroadcastStatus, StatusDisplay> = {
   draft: {
     label: "Draft",
-    classes: "bg-slate-500/10 text-slate-400 border-slate-500/20",
+    classes: "bg-slate-500/10 text-muted-foreground border-slate-500/20",
   },
   scheduled: {
     label: "Scheduled",
@@ -47,7 +50,7 @@ export const broadcastStatusConfig: Record<BroadcastStatus, StatusDisplay> = {
 export const recipientStatusConfig: Record<RecipientStatus, StatusDisplay> = {
   pending: {
     label: "Pending",
-    classes: "bg-slate-500/10 text-slate-400 border-slate-500/20",
+    classes: "bg-slate-500/10 text-muted-foreground border-slate-500/20",
   },
   sent: {
     label: "Sent",

@@ -13,6 +13,13 @@
 # testing
 /coverage
 
+# docs
+/.agents
+/ e2e
+/ infrastructure
+/ k6
+/ docs 
+
 # next.js
 /.next/
 /out/

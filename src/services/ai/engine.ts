@@ -667,8 +667,10 @@ export async function dispatchAIReply(
     // 13. Send via WhatsApp
     // ─────────────────────────────────────────────────────────
     try {
+      const contactInfo = await getConversationContact(conversationId)
       await engineSendText({
         userId: organizationId,
+        accountId: contactInfo?.accountId || '',
         conversationId,
         contactId,
         text: replyText,
@@ -808,6 +810,7 @@ async function handleHumanHandoff(args: {
       try {
         await engineSendText({
           userId: organizationId,
+          accountId: contact.accountId,
           conversationId,
           contactId: contact.contactId,
           text: handoffMessage,
@@ -838,10 +841,10 @@ async function handleHumanHandoff(args: {
 
 async function getConversationContact(
   conversationId: string
-): Promise<{ contactId: string } | null> {
+): Promise<{ contactId: string; accountId: string } | null> {
   try {
     const data = await conversationRepo.findById(conversationId)
-    return data ? { contactId: data.contact_id } : null
+    return data ? { contactId: data.contact_id, accountId: data.account_id || '' } : null
   } catch (error) {
     console.error('[AI/engine] getConversationContact failed:', error)
     return null

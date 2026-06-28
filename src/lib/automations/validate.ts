@@ -154,7 +154,13 @@ export function validateTriggerForActivation(
     } else if (k.some((v) => typeof v !== 'string' || v.trim() === '')) {
       issues.push({ path: 'trigger.keywords', message: 'keywords cannot be empty strings' })
     }
-    if (cfg.match_type !== 'exact' && cfg.match_type !== 'contains') {
+    // A missing match_type defaults to "contains" at runtime (see
+    // automations/engine.ts and flows/engine.ts, which both read
+    // `match_type ?? "contains"`), so only an explicit, unrecognised
+    // value is invalid here. This keeps activation validation in step
+    // with the engine and with the builder's "Contains" default — an
+    // automation that shows the default in the UI must not be rejected.
+    if (cfg.match_type != null && cfg.match_type !== 'exact' && cfg.match_type !== 'contains') {
       issues.push({
         path: 'trigger.match_type',
         message: 'match type must be "exact" or "contains"',
