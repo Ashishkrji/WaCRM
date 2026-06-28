@@ -9,6 +9,9 @@
 [![Next.js 16](https://img.shields.io/badge/Next.js-16%20(Turbopack)-black?logo=nextdotjs)](https://nextjs.org)
 [![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3ecf8e?logo=supabase)](https://supabase.com)
 [![TailwindCSS 4](https://img.shields.io/badge/TailwindCSS-v4.0-38bdf8?logo=tailwindcss)](https://tailwindcss.com)
+[![CI](https://github.com/AshishKmj/MJChatSyncs/actions/workflows/ci.yml/badge.svg)](https://github.com/AshishKmj/MJChatSyncs/actions/workflows/ci.yml)
+[![Stars](https://img.shields.io/github/stars/AshishKmj/MJChatSyncs?style=social)](https://github.com/AshishKmj/MJChatSyncs/stargazers)
+[![Forks](https://img.shields.io/github/forks/AshishKmj/MJChatSyncs?style=social)](https://github.com/AshishKmj/MJChatSyncs/network/members)
 
 ---
 
