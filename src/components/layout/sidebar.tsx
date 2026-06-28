@@ -147,6 +147,7 @@ const navItems: NavItem[] = [
   { href: "/integrations", label: "Integrations", icon: Webhook },
   { href: "/widgets", label: "Chat Widget", icon: MessageCircle },
   { href: "/ai-router", label: "AI Router", icon: Bot },
+  { href: "/ai-knowledge", label: "AI Knowledge", icon: BookOpen },
   { href: "/analytics", label: "Analytics (Legacy)", icon: BarChart3 },
   { href: "/team", label: "Team", icon: Users },
   { href: "/workspace", label: "Workspace & Branding", icon: Building2 },
